@@ -16,7 +16,7 @@ for flair in $(ls /project/mscamras/gadgetron/datasets-new/*/*/n4/*.nii.gz | gre
     # submit registration job
     if [[ "${missing_outfiles[*]}" =~ $(basename "$flair" .nii.gz) ]]; then
         printf "Registering %s to %s\n" $flair $mprage
-        bsub -o logs/reg.log -e logs/reg.log Rscript preproc/reg_flair2mprage.R "$flair" "$mprage"  
+        bsub -m "pennsive01 pennsive03 pennsive04 pennsive05 silver01 amber04" -o logs/reg.log -e logs/reg.log Rscript preproc/reg_flair2mprage.R "$flair" "$mprage"  
     fi
    
     

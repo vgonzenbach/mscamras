@@ -19,7 +19,7 @@ if [ "$1" == "MPRAGE" ]; then
 
         if [ ! -e "$out_brain" ]; then
             printf "Skull stripping %s" "$mprage"
-            bsub -o logs/ss.log -e logs/ss.log singularity run -e -B /project -B /scratch /project/singularity_images/mass_latest.sif \
+            bsub -m "pennsive01 pennsive03 pennsive04 pennsive05 silver01 amber04" -o logs/ss.log -e logs/ss.log singularity run -e -B /project -B /scratch /project/singularity_images/mass_latest.sif \
             -in "$mprage" -dest "$dest_dir" -ref /project/MRI_Templates/MASS_Templates/WithCerebellum -NOQ -mem 25
         fi
     done
@@ -43,7 +43,7 @@ elif [ "$1" == "FLAIR" ]; then
         out_brain=$(dirname "$brain_mask")/$(basename "$flair" .nii.gz)_brain.nii.gz
         if [ ! -e "$out_brain" ]; then
             printf "Applying %s to %s\n" "$brain_mask" "$flair"
-            bsub -o logs/ss.log -e logs/ss.log Rscript preproc/apply_brainmask.R "$flair" "$brain_mask"
+            #bsub -m "pennsive01 pennsive03 pennsive04 pennsive05 silver01 amber04" -o logs/ss.log -e logs/ss.log Rscript preproc/apply_brainmask.R "$flair" "$brain_mask"
         fi
     done
 fi
