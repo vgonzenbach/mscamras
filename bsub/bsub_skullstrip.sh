@@ -5,48 +5,45 @@ module load fsl
 module load MASS
 module load dramms/1.4.1
 
-mode=$1
 # Load paths
+if [ "$#" == 0 ]; then echo 'Enter argument: "MPRAGE" or "FLAIR"'; exit; fi
+rm -f logs/ss.log
+if [ "$1" == "MPRAGE" ]; then
 
-if [ "$1" == MPRAGE ]; then
-
-    GADG_MPRAGE=($(cut -d, -f6 file_list+preproc.csv | grep 'gadgetron' | grep 'MPRAGE')) # filter gadgtron
-    printf "There were %s MPRAGE scans found.\n" ${#GADG_MPRAGE[@]} 
-
-    for image in ${GADG_MPRAGE[@]}; do
+    for mprage in $(ls /project/mscamras/gadgetron/datasets-new/*/*/n4/*.nii.gz | grep MPRAGE); do
         # TODO: add existence check to not preprocess when output exists + add argument to force reprocessing
 
+        dest_dir=$(dirname "$mprage")/../mass
+        mkdir -p "$dest_dir"
+        out_brain="$dest_dir"/$(basename "$mprage" .nii.gz)_brain.nii.gz
 
-        # Run skull stripping as batch job
-        #bsub -o logs -e logs mass -in "$image" -dest "$(dirname $image)" \
-        #    -ref /project/MRI_Templates/MASS_Templates/WithCerebellum -NOQ -mem 20
-        bsub -o logs -e logs singularity run -e -B /project -B /scratch /project/singularity_images/mass_latest.sif \
-        -in "$image" -dest "$(dirname $image)" -ref /project/MRI_Templates/MASS_Templates/WithCerebellum -NOQ -mem 20
+        if [ ! -e "$out_brain" ]; then
+            printf "Skull stripping %s" "$mprage"
+            bsub -o logs/ss.log -e logs/ss.log singularity run -e -B /project -B /scratch /project/singularity_images/mass_latest.sif \
+            -in "$mprage" -dest "$dest_dir" -ref /project/MRI_Templates/MASS_Templates/WithCerebellum -NOQ -mem 25
+        fi
     done
 
-elif [ "$1" == FLAIR ]; then
+elif [ "$1" == "FLAIR" ]; then
 
-    GADG_FLAIR=($(cut -d, -f6 file_list+preproc.csv | grep 'gadgetron' | grep 'FLAIR'))
-    printf "There were %s FLAIR scans found.\n" ${#GADG_FLAIR[@]} 
+    for flair in $(ls /project/mscamras/gadgetron/datasets-new/*/*/reg/*.nii.gz); do
 
-    for image in ${GADG_FLAIR[@]}; do
+        if [[ "$flair" =~ "ND_n4_reg.nii.gz" ]]; then
 
-        if [ $(grep "FL_n4.nii.gz" <<< "$image" | wc -l) == 1 ]; then
-            #grep "FL_n4.nii.gz" <<< "$image"
-            #echo "Visit 1"
-            mprage_pair=$(ls $(dirname "$image") | grep "TFL_n4.nii.gz" | head -n1) # get mprage image pair
-
-            bsub -J reg2
+            brain_mask=$(find $(dirname "$flair")/../mass -name *ND_n4_brainmask.nii.gz) # get mprage brain_mask
             
-            # Insert registration and apply correct mask skullstripping
-        elif [ $(grep "FLa_n4.nii.gz" <<< "$image" | wc -l) == 1 ]; then
+        elif [[ "$flair" =~ "NDa_n4_reg.nii.gz" ]]; then
             
-            ls $(dirname "$image") | grep "TFLa_n4.nii.gz"
-            # find $(dirname "$image") -name "TFLa_n4.nii.gz"
-            #grep "FLa_n4.nii.gz" <<< "$image"
-            #echo "Visit 2"
+            brain_mask=$(find $(dirname "$flair")/../mass -name *NDa_n4_brainmask.nii.gz)
+
         else
             echo "Not found"
+        fi
+
+        out_brain=$(dirname "$brain_mask")/$(basename "$flair" .nii.gz)_brain.nii.gz
+        if [ ! -e "$out_brain" ]; then
+            printf "Applying %s to %s\n" "$brain_mask" "$flair"
+            bsub -o logs/ss.log -e logs/ss.log Rscript preproc/apply_brainmask.R "$flair" "$brain_mask"
         fi
     done
 fi
