@@ -7,20 +7,33 @@ suppressMessages(library(dplyr))
 #file_list = system('ls /project/mscamras/gadgetron/datasets-new/*/*/*.nii.gz | grep MPRAGE', intern=TRUE)
 
 # Dictionary of all
+
+argv = commandArgs(trailingOnly = TRUE)
+mode = argv[1]
+
+if ( (mode != 'gadgetron') && (mode != 'onscanner')){
+    stop("Pass mode argument: 'gadgetron' or 'onscanner'")
+}
+
 jlf_dict = readxl::read_xlsx('/home/vgonzenb/MSKIDS/data/MUSE_ROI_Dict.xlsx')
 jlf_dict = jlf_dict[jlf_dict$ROI_INDEX %in% 1:200, ]
 tissue_ind = lapply(c("GM","WM"), function(x) jlf_dict$ROI_INDEX[jlf_dict$TISSUE_SEG == x])
 
 load.t1.df = function(){
     df = read.csv('file_list.csv')
-    df = df[df$img_source == 'gadgetron' & 
+    df = df[df$img_source == mode & 
             grepl("MPRAGE", df$img_type) & 
             !is.na(df$orig) & 
             df$orig != "",]
     rownames(df) = 1:nrow(df)
     #df[, "original"] = NULL
     colnames(df)[length(df)] = 'source_path'
-    df[, 'source_path'] = sprintf("%s_n4_brain.nii.gz", neurobase::nii.stub(df$source_path))
+    if (mode == 'gadgetron'){
+        df[, 'source_path'] = sprintf("%s_n4_brain.nii.gz", neurobase::nii.stub(df$source_path))
+    } else if (mode == 'onscanner'){
+        df[, 'source_path'] = sprintf("%s_n4_brain.nii.gz", gsub("NIFTI", "analysis/mass", neurobase::nii.stub(df$source_path)))
+    }
+    
     return(df)
 }
 
@@ -29,7 +42,13 @@ get.vol = function(path, type="Atropos"){
     # Transform input path
     if (type == "Atropos"){
 
-        seg_path = file.path(dirname(path), "Atropos", paste0(neurobase::nii.stub(basename(path)), "_atropos_seg.nii.gz"))
+        if (mode == 'gadgetron'){
+            seg_path = file.path(dirname(path), "..", "Atropos", paste0(neurobase::nii.stub(basename(path)), "_atropos_seg.nii.gz"))
+
+        } else if (mode == 'onscanner'){
+            seg_path = file.path(dirname(path), "..", "Atropos", gsub("_brain.nii.gz", "", basename(path)), paste0(neurobase::nii.stub(gsub("_brain.nii.gz", "", basename(path))), "_atropos_seg.nii.gz"))
+        }
+        
         out = tryCatch({
             seg = neurobase::readnii(seg_path) # Load image
             vol_table = table(seg)[-1] * voxres(seg, units = "cm") # Get volumes for each label
@@ -44,7 +63,11 @@ get.vol = function(path, type="Atropos"){
         })
     } else if (type == "FAST"){
 
-        seg_path = file.path(dirname(path), "FAST", paste0(neurobase::nii.stub(basename(path)), "_seg.nii.gz"))
+        if (mode == 'gadgetron'){
+            seg_path = file.path(dirname(path), "..", "FAST", paste0(neurobase::nii.stub(basename(path)), "_seg.nii.gz"))
+        } else if (mode == 'onscanner'){
+            seg_path = file.path(dirname(path), "..", "FAST", gsub("_brain.nii.gz", "", basename(path)), paste0(neurobase::nii.stub(basename(path)), "_seg.nii.gz"))
+        }
         out = tryCatch({
             seg = neurobase::readnii(seg_path) # Load image
             vol_table = table(seg)[-1] * voxres(seg, units = "cm") # Get volumes for each label
@@ -59,13 +82,24 @@ get.vol = function(path, type="Atropos"){
         })
     } else if (type == "JLF"){
 
-        seg_path = file.path(dirname(path), "JLF_WMGM", neurobase::nii.stub(basename(path)), "fused_wmgm_labels.nii.gz")
+        if (mode == 'gadgetron'){
+            seg_path = file.path(dirname(path), "..", "JLF_WMGM", neurobase::nii.stub(basename(path)), "fused_wmgm_labels.nii.gz")
+        } else if (mode == 'onscanner'){
+            seg_path = file.path(dirname(path), "..", "JLF_WMGM", gsub("_brain.nii.gz", "", basename(path)), "jlf_wmgm_mask.nii.gz")
+        
+        }
+         
         out = tryCatch({
             seg = neurobase::readnii(seg_path) # Load image
             vol_table = table(seg)[-1] * voxres(seg, units = "cm") # Get volumes for each label
 
             vols = c()
-            for (i in tissue_ind) vols = c(vols, sum(vol_table[as.character(i)]))
+            if (mode == 'gadgetron'){
+                for (i in tissue_ind) vols = c(vols, sum(vol_table[as.character(i)]))
+            } else if (mode == 'onscanner'){
+                vols = vol_table
+            }
+            
             vol_df = data.frame(t(matrix(vols)))
             colnames(vol_df) = paste(type, c("GM", "WM"), sep="_")
             vol_df
@@ -77,7 +111,12 @@ get.vol = function(path, type="Atropos"){
         })
     } else if (type == "FIRST"){
 
-        seg_path = file.path(dirname(path), "FIRST", paste0(neurobase::nii.stub(basename(path)), "_all_none_firstseg.nii.gz"))
+        if (mode == 'gadgetron'){
+            seg_path = file.path(dirname(path), "..", "FIRST", paste0(neurobase::nii.stub(basename(path)), "_all_none_firstseg.nii.gz"))
+        } else if (mode == 'onscanner'){
+            seg_path = file.path(dirname(path), "..", "FIRST", gsub("_brain.nii.gz", "", basename(path)), paste0(neurobase::nii.stub(basename(path)), "_thalamus_all_none_firstseg.nii.gz"))
+        }
+        
         out = tryCatch({
             seg = neurobase::readnii(seg_path) # Load image
             vol_table = table(seg)[-1] * voxres(seg, units = "cm")
@@ -88,7 +127,12 @@ get.vol = function(path, type="Atropos"){
         })
     } else if (type == "JLF_thal"){
 
-        seg_path = file.path(dirname(path), "JLF_thal", neurobase::nii.stub(basename(path)), "fused_thal_mask.nii.gz")
+        if (mode == 'gadgetron'){
+            seg_path = file.path(dirname(path), "..", "JLF_thal", neurobase::nii.stub(basename(path)), "fused_thal_mask.nii.gz")
+        } else if (mode == 'onscanner'){
+            seg_path = file.path(dirname(path), "..", "JLF_thal",  gsub("_brain.nii.gz", "", basename(path)), "jlf_thal_mask.nii.gz")
+        }
+        
         out = tryCatch({
             seg = neurobase::readnii(seg_path) # Load image
             vol_table = table(seg)[-1] * voxres(seg, units = "cm") # Get volumes for each label
@@ -99,7 +143,16 @@ get.vol = function(path, type="Atropos"){
         })
     } else if (type == "mimosa"){
 
-        seg_path = file.path(dirname(path), "mimosa", neurobase::nii.stub(basename(path)), "bin_mask_0.2.nii.gz")
+        if (mode == 'gadgetron'){
+            seg_path = file.path(dirname(path), "..", "mimosa", neurobase::nii.stub(basename(path)), "bin_mask_0.2.nii.gz")
+        } else if (mode == 'onscanner'){
+            if (grepl('ND_', path)){
+                seg_path = file.path(dirname(path), "..", "mimosa_ND", 'scan1_mimosa_binary_mask_0.2_ND.nii.gz')
+            } else if (grepl('NDa_', path)){
+                seg_path = file.path(dirname(path), "..", "mimosa_ND", 'scan2_mimosa_binary_mask_0.2_ND.nii.gz')
+            }
+        }
+        
         out = tryCatch({
             seg = neurobase::readnii(seg_path) # Load image
             vol_table = table(seg)[-1] * voxres(seg, units = "cm") # Get volumes for each label
@@ -132,9 +185,10 @@ df = load.t1.df()
 
 vol_df = dplyr::bind_rows(parallel::mclapply(df$source_path, get.vols, mc.cores = Sys.getenv('LSB_DJOB_NUMPROC')))
 
-vol_df_merged = cbind(df, vol_df)
+vol_df_merged = merge(df, vol_df, by='source_path')
 vol_df_merged[, "source_path"] = NULL
 
 # Save merged data.frame
-write.csv(vol_df_merged, "gadgetron_volumes.csv", row.names = FALSE) # TODO: change output path based on argument 'out'
-message(sprintf("Volumes saved to %s", "gadgetron_volumes.csv"))
+outpath = sprintf("%s_volumes.csv", mode)
+write.csv(vol_df_merged, outpath, row.names = FALSE) 
+message(sprintf("Volumes saved to %s", outpath))
