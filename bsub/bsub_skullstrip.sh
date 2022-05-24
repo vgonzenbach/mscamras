@@ -10,17 +10,20 @@ if [ "$#" == 0 ]; then echo 'Enter argument: "MPRAGE" or "FLAIR"'; exit; fi
 rm -f logs/ss.log
 if [ "$1" == "MPRAGE" ]; then
 
-    for mprage in $(ls /project/mscamras/gadgetron/datasets-new/*/*/n4/*.nii.gz | grep MPRAGE); do
+    for mprage in $(ls /project/mscamras/gadgetron/datasets-new/*/*/*.nii.gz | grep MPRAGE); do
         # TODO: add existence check to not preprocess when output exists + add argument to force reprocessing
 
-        dest_dir=$(dirname "$mprage")/../mass
+        dest_dir=$(dirname "$mprage")/brain
         mkdir -p "$dest_dir"
         out_brain="$dest_dir"/$(basename "$mprage" .nii.gz)_brain.nii.gz
 
         if [ ! -e "$out_brain" ]; then
             printf "Skull stripping %s" "$mprage"
-            bsub -m "pennsive01 pennsive03 pennsive04 pennsive05 silver01 amber04" -o logs/ss.log -e logs/ss.log singularity run -e -B /project -B /scratch /project/singularity_images/mass_latest.sif \
-            -in "$mprage" -dest "$dest_dir" -ref /project/MRI_Templates/MASS_Templates/WithCerebellum -NOQ -mem 25
+            #Rscript preproc/apply_brainmask.R "$flair" "$brain_mask"
+            dir=$(echo $(dirname $mprage) | sed 's/gadgetron\/datasets-new/Data/g')
+            brainmask="$dir"/analysis/mass/$(basename $mprage .nii.gz | sed 's/^.*\(MPRAGE\)/\1/g')_n4_brainmask.nii.gz
+            bsub -m "pennsive01 pennsive03 pennsive04 pennsive05 silver01 amber04" -o logs/ss.log -e logs/ss.log Rscript preproc/apply_brainmask.R "$mprage" "$brainmask" "$dest_dir"
+
         fi
     done
 

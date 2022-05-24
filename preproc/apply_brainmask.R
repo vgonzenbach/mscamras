@@ -6,12 +6,12 @@ library(fslr)
 # Applies brain mask from mprage to registered flair
 
 argv = commandArgs(trailingOnly = TRUE)
-reg_flair = argv[1]
+image = argv[1]
 brain_mask = argv[2]
+out_dir = argv[3]
 
-flair_brain = neurobase::readnii(reg_flair) * neurobase::readnii(brain_mask)
+brain = neurobase::readnii(image) * neurobase::readnii(brain_mask)
 
-output_path = file.path(dirname(reg_flair), "..", "mass",
-                        stringr::str_replace(basename(reg_flair), '.nii.gz', '_brain.nii.gz'))
-neurobase::writenii(flair_brain, output_path)
+output_path = file.path(out_dir, stringr::str_replace(basename(image), '.nii.gz', '_brain.nii.gz'))
+neurobase::writenii(brain, output_path)
 sprintf("Output saved to %s", output_path)
