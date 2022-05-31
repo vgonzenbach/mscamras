@@ -16,8 +16,9 @@ for mprage in $(find /project/mscamras/gadgetron/datasets-new -name *brain_n4.ni
         elif [[ "$mprage" =~ 'MPRAGE_SAG_TFL_NDa' ]]; then
             flair=$(find $(dirname "$mprage") -name *FLAIR_SAG_VFL_NDa_reg_brain_n4.nii.gz)
         fi
-    
-        brain_mask=$(find $(dirname "$mprage") -name $(sed 's/brain.nii.gz/brainmask.nii.gz/g' <<< $(basename "$mprage")))
+
+        dir=$(echo $(dirname $mprage) | sed 's/\/n4//g ; s/gadgetron\/datasets-new/Data/g')
+        brain_mask="$dir"/analysis/mass/$(basename $mprage .nii.gz | sed 's/_brain_n4//g ; s/^.*\(MPRAGE\)/\1/g')_n4_brainmask.nii.gz
     
         printf "Running mimosa:\nMPRAGE:%s\nFLAIR:%s\nMask:%s\n" "$mprage" "$flair" "$brain_mask"
         bsub -m "pennsive01 pennsive03 pennsive04 pennsive05 silver01 amber04" -J mimosa_"$i" -o logs/mimosa.log -e logs/mimosa.log Rscript vols/run_mimosa.R "$mprage" "$flair" "$brain_mask"

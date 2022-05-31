@@ -12,10 +12,10 @@ for image in $(ls /project/mscamras/gadgetron/datasets-new/*/*/*.nii.gz); do
 
     elif [ $preproc == 'n4' ]; then
         if [[ "$image" =~ 'FLAIR' ]]; then
-            file=$(dirname "$image")/n4/$(basename "$image" .nii.gz)_reg_brain_n4.nii.gz
-        elif [[ "$image" =~ 'MPRAGE' ]]; then
-            file=$(dirname "$image")/n4/$(basename "$image" .nii.gz)_brain_n4.nii.gz
-        fi
+                file=$(dirname "$image")/n4/$(basename "$image" .nii.gz)_reg_brain_n4.nii.gz
+            elif [[ "$image" =~ 'MPRAGE' ]]; then
+                file=$(dirname "$image")/n4/$(basename "$image" .nii.gz)_brain_n4.nii.gz
+            fi
         
 
     elif [ $preproc == 'reg' ]; then
@@ -55,7 +55,7 @@ for image in $(ls /project/mscamras/gadgetron/datasets-new/*/*/*.nii.gz); do
 
     elif [ $preproc == 'brainmask' ]; then 
         if [[ "$image" =~ 'MPRAGE' ]]; then
-            file=$(dirname "$image")/mass/$(basename "$image" .nii.gz)_n4_brainmask.nii.gz
+            file=$(dirname "$image")/mass/$(basename "$image" .nii.gz)_brainmask.nii.gz
         elif [[ "$image" =~ 'FLAIR' ]]; then
             continue
         fi
@@ -77,30 +77,14 @@ for image in $(ls /project/mscamras/gadgetron/datasets-new/*/*/*.nii.gz); do
 
     elif [ $preproc == 'fused_thal_seg' ]; then 
         if [[ "$image" =~ 'MPRAGE' ]]; then
-<<<<<<< HEAD
-<<<<<<< Updated upstream
-            file="$(dirname $image)/JLF_thal/$(basename $image .nii.gz)_n4_brain/fused_thal_mask.nii.gz"
-=======
             file="$(dirname $image)/JLF_thal/$(basename $image .nii.gz)_brain_n4/fused_thal_seg.nii.gz"
->>>>>>> Stashed changes
-=======
-            file="$(dirname $image)/JLF_thal/$(basename $image .nii.gz)_brain_n4/fused_thal_mask.nii.gz"
->>>>>>> Update analysis to v3
         elif [[ "$image" =~ 'FLAIR' ]]; then
             continue
         fi
 
     elif [ $preproc == 'fused_WMGM_seg' ]; then 
         if [[ "$image" =~ 'MPRAGE' ]]; then
-<<<<<<< HEAD
-<<<<<<< Updated upstream
-            file="$(dirname $image)/JLF_WMGM/$(basename $image .nii.gz)_n4_brain/fused_wmgm_labels.nii.gz"
-=======
             file="$(dirname $image)/JLF_WMGM/$(basename $image .nii.gz)_brain_n4/fused_WMGM_seg.nii.gz"
->>>>>>> Stashed changes
-=======
-            file="$(dirname $image)/JLF_WMGM/$(basename $image .nii.gz)_brain_n4/fused_wmgm_labels.nii.gz"
->>>>>>> Update analysis to v3
         elif [[ "$image" =~ 'FLAIR' ]]; then
             continue
         fi
@@ -140,17 +124,12 @@ for image in $(ls /project/mscamras/gadgetron/datasets-new/*/*/*.nii.gz); do
     fi
 
     # Check file existence
-    if [ "$preproc" == "JLF_thal" ] || [ "$preproc" == "JLF_WMGM" ]; then
-        if [ ! $(ls $file/*/* | wc -l) -eq 20 ]; then
-            MISSING_FILES+=($file)
-        fi
-
-    elif [ ! -e $file ]; then 
+    if [ ! -e $file ]; then 
         MISSING_FILES+=($file)
 
     elif [ "$preproc" == "JLF_thal" ] || [ "$preproc" == "JLF_WMGM" ] ; then
             #reg_files=$(find $file -type f || true)
-            if [ ! $(find $file -type f | wc -l) -eq 20 ]; then
+            if [ ! $(find $file -type f | wc -l) -ge 20 ]; then
                 MISSING_FILES+=($file)
             fi
     fi
