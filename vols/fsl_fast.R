@@ -7,7 +7,7 @@ library(parallel)
 
 ##FSL FAST segmentation for GM, WM, and CSF
 
-t1s = system(paste("find /project/mscamras/gadgetron/datasets-new -name *n4_brain.nii.gz | grep 'MPRAGE'"),intern=TRUE) 
+t1s = system(paste("find /project/mscamras/gadgetron/datasets-new -name *brain_n4.nii.gz | grep 'MPRAGE'"),intern=TRUE) 
 
 do.fast = function(i){
 

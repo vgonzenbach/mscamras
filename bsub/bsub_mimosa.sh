@@ -7,14 +7,14 @@ missing_outfiles=($(bash inv/check_files.sh 'mimosa'))
 i=0 # for naming jobs
 rm -f logs/mimosa.log # clear previous logs
 # Pair mprages with masks, flairs then bsub mimosa
-for mprage in $(find /project/mscamras/gadgetron/datasets-new -name *n4_brain.nii.gz); do 
+for mprage in $(find /project/mscamras/gadgetron/datasets-new -name *brain_n4.nii.gz | grep MPRAGE); do 
     
     if [[ "${missing_outfiles[*]}" =~ "$(basename $mprage .nii.gz)" ]]; then
     # run mimosa only is file is missing
         if [[ "$mprage" =~ 'MPRAGE_SAG_TFL_ND_' ]]; then
-            flair=$(find $(dirname "$mprage") -name *FLAIR_SAG_VFL_ND_n4_reg_brain.nii.gz)
+            flair=$(find $(dirname "$mprage") -name *FLAIR_SAG_VFL_ND_reg_brain_n4.nii.gz)
         elif [[ "$mprage" =~ 'MPRAGE_SAG_TFL_NDa' ]]; then
-            flair=$(find $(dirname "$mprage") -name *FLAIR_SAG_VFL_NDa_n4_reg_brain.nii.gz)
+            flair=$(find $(dirname "$mprage") -name *FLAIR_SAG_VFL_NDa_reg_brain_n4.nii.gz)
         fi
     
         brain_mask=$(find $(dirname "$mprage") -name $(sed 's/brain.nii.gz/brainmask.nii.gz/g' <<< $(basename "$mprage")))

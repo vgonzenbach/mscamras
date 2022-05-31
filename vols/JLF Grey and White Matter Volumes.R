@@ -3,7 +3,7 @@ library(extrantsr)
 library(neurobase)
 library(parallel)
 
-t1s = system("find /project/mscamras/gadgetron/datasets-new -name *n4_brain.nii.gz | grep 'MPRAGE'", intern=TRUE) 
+t1s = system("find /project/mscamras/gadgetron/datasets-new -name *brain_n4.nii.gz | grep 'MPRAGE'", intern=TRUE) 
 
 do.jlf = function(i) {
 

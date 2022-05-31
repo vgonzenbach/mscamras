@@ -11,11 +11,16 @@ for image in $(ls /project/mscamras/gadgetron/datasets-new/*/*/*.nii.gz); do
         file=$image
 
     elif [ $preproc == 'n4' ]; then
-        file=$(dirname "$image")/n4/$(basename "$image" .nii.gz)_n4.nii.gz
+        if [[ "$image" =~ 'FLAIR' ]]; then
+            file=$(dirname "$image")/n4/$(basename "$image" .nii.gz)_reg_brain_n4.nii.gz
+        elif [[ "$image" =~ 'MPRAGE' ]]; then
+            file=$(dirname "$image")/n4/$(basename "$image" .nii.gz)_brain_n4.nii.gz
+        fi
+        
 
     elif [ $preproc == 'reg' ]; then
         if [[ "$image" =~ 'FLAIR' ]]; then
-            file=$(dirname "$image")/reg/$(basename "$image" .nii.gz)_n4_reg.nii.gz
+            file=$(dirname "$image")/reg/$(basename "$image" .nii.gz)_reg.nii.gz
         elif [[ "$image" =~ 'MPRAGE' ]]; then
             continue
         fi
@@ -43,9 +48,9 @@ for image in $(ls /project/mscamras/gadgetron/datasets-new/*/*/*.nii.gz); do
 
     elif [ $preproc == 'brain' ]; then 
         if [[ "$image" =~ 'FLAIR' ]]; then
-            file=$(dirname "$image")/mass/$(basename "$image" .nii.gz)_n4_reg_brain.nii.gz
+            file=$(dirname "$image")/brain/$(basename "$image" .nii.gz)_reg_brain.nii.gz
         elif [[ "$image" =~ 'MPRAGE' ]]; then
-            file=$(dirname "$image")/mass/$(basename "$image" .nii.gz)_n4_brain.nii.gz
+            file=$(dirname "$image")/brain/$(basename "$image" .nii.gz)_brain.nii.gz
         fi
 
     elif [ $preproc == 'brainmask' ]; then 
@@ -57,7 +62,7 @@ for image in $(ls /project/mscamras/gadgetron/datasets-new/*/*/*.nii.gz); do
     
     elif [ $preproc == 'JLF_thal' ]; then
         if [[ "$image" =~ 'MPRAGE' ]]; then
-            file="$(dirname $image)/JLF_thal/$(basename $image .nii.gz)_n4_brain" # a directory; not a file
+            file="$(dirname $image)/JLF_thal/$(basename $image .nii.gz)_brain_n4" # a directory; not a file
         elif [[ "$image" =~ 'FLAIR' ]]; then
             continue
         fi
@@ -65,57 +70,65 @@ for image in $(ls /project/mscamras/gadgetron/datasets-new/*/*/*.nii.gz); do
 
     elif [ $preproc == 'JLF_WMGM' ]; then
         if [[ "$image" =~ 'MPRAGE' ]]; then
-            file="$(dirname $image)/JLF_WMGM/$(basename $image .nii.gz)_n4_brain" # a directory; not a file
+            file="$(dirname $image)/JLF_WMGM/$(basename $image .nii.gz)_brain_n4" # a directory; not a file
         elif [[ "$image" =~ 'FLAIR' ]]; then
             continue
         fi
 
     elif [ $preproc == 'fused_thal_seg' ]; then 
         if [[ "$image" =~ 'MPRAGE' ]]; then
+<<<<<<< HEAD
 <<<<<<< Updated upstream
             file="$(dirname $image)/JLF_thal/$(basename $image .nii.gz)_n4_brain/fused_thal_mask.nii.gz"
 =======
             file="$(dirname $image)/JLF_thal/$(basename $image .nii.gz)_brain_n4/fused_thal_seg.nii.gz"
 >>>>>>> Stashed changes
+=======
+            file="$(dirname $image)/JLF_thal/$(basename $image .nii.gz)_brain_n4/fused_thal_mask.nii.gz"
+>>>>>>> Update analysis to v3
         elif [[ "$image" =~ 'FLAIR' ]]; then
             continue
         fi
 
     elif [ $preproc == 'fused_WMGM_seg' ]; then 
         if [[ "$image" =~ 'MPRAGE' ]]; then
+<<<<<<< HEAD
 <<<<<<< Updated upstream
             file="$(dirname $image)/JLF_WMGM/$(basename $image .nii.gz)_n4_brain/fused_wmgm_labels.nii.gz"
 =======
             file="$(dirname $image)/JLF_WMGM/$(basename $image .nii.gz)_brain_n4/fused_WMGM_seg.nii.gz"
 >>>>>>> Stashed changes
+=======
+            file="$(dirname $image)/JLF_WMGM/$(basename $image .nii.gz)_brain_n4/fused_wmgm_labels.nii.gz"
+>>>>>>> Update analysis to v3
         elif [[ "$image" =~ 'FLAIR' ]]; then
             continue
         fi
 
     elif [ $preproc == 'Atropos' ]; then 
         if [[ "$image" =~ 'MPRAGE' ]]; then
-            file="$(dirname $image)/Atropos/$(basename $image .nii.gz)_n4_brain_atropos_seg.nii.gz"
+            file="$(dirname $image)/Atropos/$(basename $image .nii.gz)_brain_n4_atropos_seg.nii.gz"
         elif [[ "$image" =~ 'FLAIR' ]]; then
             continue
         fi
 
     elif [ $preproc == 'FAST' ]; then 
         if [[ "$image" =~ 'MPRAGE' ]]; then
-            file="$(dirname $image)/FAST/$(basename $image .nii.gz)_n4_brain_seg.nii.gz"
+            file="$(dirname $image)/FAST/$(basename $image .nii.gz)_brain_n4_seg.nii.gz"
         elif [[ "$image" =~ 'FLAIR' ]]; then
             continue
         fi
 
     elif [ $preproc == 'FIRST' ]; then 
         if [[ "$image" =~ 'MPRAGE' ]]; then
-            file="$(dirname $image)/FIRST/$(basename $image .nii.gz)_n4_brain_all_none_firstseg.nii.gz"
+            file="$(dirname $image)/FIRST/$(basename $image .nii.gz)_brain_n4_all_none_firstseg.nii.gz"
         elif [[ "$image" =~ 'FLAIR' ]]; then
             continue
         fi
     
     elif [ $preproc == 'mimosa' ]; then 
         if [[ "$image" =~ 'MPRAGE' ]]; then
-            file="$(dirname $image)/mimosa/$(basename $image .nii.gz)_n4_brain/bin_mask_0.2.nii.gz"
+            file="$(dirname $image)/mimosa/$(basename $image .nii.gz)_brain_n4/bin_mask_0.2.nii.gz"
         elif [[ "$image" =~ 'FLAIR' ]]; then
             continue
         fi
@@ -127,7 +140,12 @@ for image in $(ls /project/mscamras/gadgetron/datasets-new/*/*/*.nii.gz); do
     fi
 
     # Check file existence
-    if [ ! -e $file ]; then 
+    if [ "$preproc" == "JLF_thal" ] || [ "$preproc" == "JLF_WMGM" ]; then
+        if [ ! $(ls $file/*/* | wc -l) -eq 20 ]; then
+            MISSING_FILES+=($file)
+        fi
+
+    elif [ ! -e $file ]; then 
         MISSING_FILES+=($file)
 
     elif [ "$preproc" == "JLF_thal" ] || [ "$preproc" == "JLF_WMGM" ] ; then

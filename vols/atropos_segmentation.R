@@ -7,7 +7,7 @@ library(parallel)
 
 #ATROPOS for GM, WM, and CSF
 
-t1s = system("find /project/mscamras/gadgetron/datasets-new -name *brain.nii.gz | grep 'MPRAGE'", intern=TRUE) 
+t1s = system("find /project/mscamras/gadgetron/datasets-new -name *brain_n4.nii.gz | grep 'MPRAGE'", intern=TRUE) 
 
 do.atropos = function(i){
   #imgs = list.files(path = dirs[j], pattern = "*_brain.nii.gz",full.names = TRUE)

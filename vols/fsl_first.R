@@ -7,7 +7,7 @@ library(parallel)
 
 ##FSL First segmentation for deep grey structures
 
-t1s = system("find /project/mscamras/gadgetron/datasets-new -name *n4_brain.nii.gz | grep 'MPRAGE'",intern=TRUE) 
+t1s = system("find /project/mscamras/gadgetron/datasets-new -name *brain_n4.nii.gz | grep 'MPRAGE'",intern=TRUE) 
 
 # imgs = list.files(path = ".", pattern = "mp2rage_UNI_fslbet_stripped.nii.gz",full.names = TRUE, recursive = TRUE)
 

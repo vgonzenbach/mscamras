@@ -4,7 +4,7 @@ library(neurobase)
 library(parallel)
 
 # Run for missing only
-t1s = system('find /project/mscamras/gadgetron/datasets-new/ -name *brain.nii.gz | grep MPRAGE', intern=TRUE)
+t1s = system('find /project/mscamras/gadgetron/datasets-new/ -name *brain_n4.nii.gz | grep MPRAGE', intern=TRUE)
 #THAL_MASKS=($(find /project/mscamras/gadgetron/datasets-new/ -name *reg*_mask.nii.gz))
 #THAL_DIRS=($(find /project/mscamras/gadgetron/datasets-new/ -name *brain.nii.gz | grep MPRAGE))
 #

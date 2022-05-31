@@ -30,23 +30,21 @@ if [ "$1" == "MPRAGE" ]; then
 elif [ "$1" == "FLAIR" ]; then
 
     for flair in $(ls /project/mscamras/gadgetron/datasets-new/*/*/reg/*.nii.gz); do
+        # TODO: add existence check to not preprocess when output exists + add argument to force reprocessing
 
-        if [[ "$flair" =~ "ND_n4_reg.nii.gz" ]]; then
+        dest_dir=$(dirname "$flair")/../brain
+        mkdir -p "$dest_dir"
 
-            brain_mask=$(find $(dirname "$flair")/../mass -name *ND_n4_brainmask.nii.gz) # get mprage brain_mask
-            
-        elif [[ "$flair" =~ "NDa_n4_reg.nii.gz" ]]; then
-            
-            brain_mask=$(find $(dirname "$flair")/../mass -name *NDa_n4_brainmask.nii.gz)
+        out_brain="$dest_dir"/$(basename "$flair" .nii.gz)_brain.nii.gz
 
-        else
-            echo "Not found"
-        fi
-
-        out_brain=$(dirname "$brain_mask")/$(basename "$flair" .nii.gz)_brain.nii.gz
         if [ ! -e "$out_brain" ]; then
-            printf "Applying %s to %s\n" "$brain_mask" "$flair"
-            #bsub -m "pennsive01 pennsive03 pennsive04 pennsive05 silver01 amber04" -o logs/ss.log -e logs/ss.log Rscript preproc/apply_brainmask.R "$flair" "$brain_mask"
+            
+            printf "Skull stripping %s\n" "$flair"
+            #Rscript preproc/apply_brainmask.R "$flair" "$brain_mask"
+            dir=$(echo $(dirname $flair) | sed 's/gadgetron\/datasets-new/Data/g' | cut -d/ -f1-6)
+            brainmask="$dir"/analysis/mass/$(basename $flair .nii.gz | sed 's/_reg//g; s/VFL/TFL/g; s/FLAIR/MPRAGE/g; s/^.*\(MPRAGE\)/\1/g')_n4_brainmask.nii.gz
+            bsub -m "pennsive01 pennsive03 pennsive04 pennsive05 silver01 amber04" -o logs/ss.log -e logs/ss.log Rscript preproc/apply_brainmask.R "$flair" "$brainmask" "$dest_dir"
+
         fi
     done
 fi
