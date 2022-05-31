@@ -10,8 +10,8 @@ declare -a wmgm
 
 # Fill arrays
 for i in {0..9}; do
-	atlas[$i]="${dir}/muse_to_t1/jlf_muse_reg$(expr $i + 1).nii.gz"
-	wmgm[$i]="${dir}/muse_wmgm_to_t1/jlf_muse_reg$(expr $i + 1)_wmgm.nii.gz"
+	atlas[$i]="${dir}/atlas_to_t1/jlf_template_reg$(expr $i + 1).nii.gz"
+	wmgm[$i]="${dir}/seg_to_t1/jlf_wmgm_reg$(expr $i + 1).nii.gz"
 done
 
 echo 'Running antsJointFusion...'
