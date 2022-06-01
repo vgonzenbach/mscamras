@@ -70,16 +70,24 @@ for image in $(ls /project/mscamras/gadgetron/datasets-new/*/*/*.nii.gz); do
             continue
         fi
 
-    elif [ $preproc == 'fused_thal_mask' ]; then 
+    elif [ $preproc == 'fused_thal_seg' ]; then 
         if [[ "$image" =~ 'MPRAGE' ]]; then
+<<<<<<< Updated upstream
             file="$(dirname $image)/JLF_thal/$(basename $image .nii.gz)_n4_brain/fused_thal_mask.nii.gz"
+=======
+            file="$(dirname $image)/JLF_thal/$(basename $image .nii.gz)_brain_n4/fused_thal_seg.nii.gz"
+>>>>>>> Stashed changes
         elif [[ "$image" =~ 'FLAIR' ]]; then
             continue
         fi
 
-    elif [ $preproc == 'fused_wmgm_labels' ]; then 
+    elif [ $preproc == 'fused_WMGM_seg' ]; then 
         if [[ "$image" =~ 'MPRAGE' ]]; then
+<<<<<<< Updated upstream
             file="$(dirname $image)/JLF_WMGM/$(basename $image .nii.gz)_n4_brain/fused_wmgm_labels.nii.gz"
+=======
+            file="$(dirname $image)/JLF_WMGM/$(basename $image .nii.gz)_brain_n4/fused_WMGM_seg.nii.gz"
+>>>>>>> Stashed changes
         elif [[ "$image" =~ 'FLAIR' ]]; then
             continue
         fi
@@ -114,13 +122,18 @@ for image in $(ls /project/mscamras/gadgetron/datasets-new/*/*/*.nii.gz); do
 
     else
         echo "Enter correct preproc parameters from allowable options: 'orig', 'n4', 'reg', 'brain', 'brainmask', 'JLF_thal', \
-        'JLF_WMGM', 'fused_wmgm_labels', 'fused_thal_mask', 'Atropos', 'FAST', 'FIRST', 'mimosa'"
+        'JLF_WMGM', 'fused_WMGM_seg', 'fused_thal_seg', 'Atropos', 'FAST', 'FIRST', 'mimosa'"
         exit
     fi
 
     # Check file existence
     if [ ! -e $file ]; then 
         MISSING_FILES+=($file)
+    elif [ "$preproc" == "JLF_thal" ] || [ "$preproc" == "JLF_WMGM" ] ; then
+            #reg_files=$(find $file -type f || true)
+            if [ ! $(find $file -type f | wc -l) -eq 20 ]; then
+                MISSING_FILES+=($file)
+            fi
     fi
 done 
 

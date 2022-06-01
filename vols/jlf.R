@@ -29,7 +29,9 @@ if (mode == 'WMGM'){
 reg_atlas_and_seg = function(j){
     t1.nii = neurobase::readnii(t1)
     atlas = sprintf(in_atlas, j)
-    seg = sprintf(in_seg, rep(j, stringr::str_count(in_seg, "%s")))
+    
+    n = stringr::str_count(in_seg, "%s")
+    seg = do.call("sprintf", c(list(in_seg), as.list(rep(j, stringr::str_count(in_seg, "%s")))))
 
     message(sprintf("Registering atlas to %s", t1))
     atlas_to_image = registration(filename = atlas,
@@ -43,13 +45,13 @@ reg_atlas_and_seg = function(j){
                                    transformlist = atlas_to_image$fwdtransforms, interpolator = "nearestNeighbor")
     
     antsImageWrite(atlas_reg, file.path(out_atlas_dir, sprintf("jlf_template_reg%s.nii.gz", j)))
-    antsImageWrite(seg_reg, file.path(out_seg_dir, sprintf("jlf_%s_reg%s.nii.gz", tolower(mode), j)))
+    antsImageWrite(seg_reg, file.path(out_seg_dir, sprintf("jlf_%s_reg%s.nii.gz", mode, j)))
 }
 
 for(j in 1:10){
     # Run registration only if files are not found
     if(!file.exists(file.path(out_atlas_dir, sprintf("jlf_template_reg%s.nii.gz", j))) ||
-       !file.exists(file.path(out_seg_dir,sprintf("jlf_%s_reg%s.nii.gz", tolower(mode), j)))){
+       !file.exists(file.path(out_seg_dir,sprintf("jlf_%s_reg%s.nii.gz", mode, j)))){
            reg_atlas_and_seg(j)
        } 
 }

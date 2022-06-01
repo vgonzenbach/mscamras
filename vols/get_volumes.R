@@ -83,7 +83,7 @@ get.vol = function(path, type="Atropos"){
     } else if (type == "JLF"){
 
         if (mode == 'gadgetron'){
-            seg_path = file.path(dirname(path), "..", "JLF_WMGM", neurobase::nii.stub(basename(path)), "fused_wmgm_labels.nii.gz")
+            seg_path = file.path(dirname(path), "..", "JLF_WMGM", neurobase::nii.stub(basename(path)), "fused_wmgm_seg.nii.gz")
         } else if (mode == 'onscanner'){
             seg_path = file.path(dirname(path), "..", "JLF_WMGM", gsub("_brain.nii.gz", "", basename(path)), "jlf_wmgm_mask.nii.gz")
         
@@ -128,7 +128,7 @@ get.vol = function(path, type="Atropos"){
     } else if (type == "JLF_thal"){
 
         if (mode == 'gadgetron'){
-            seg_path = file.path(dirname(path), "..", "JLF_thal", neurobase::nii.stub(basename(path)), "fused_thal_mask.nii.gz")
+            seg_path = file.path(dirname(path), "..", "JLF_thal", neurobase::nii.stub(basename(path)), "fused_thal_seg.nii.gz")
         } else if (mode == 'onscanner'){
             seg_path = file.path(dirname(path), "..", "JLF_thal",  gsub("_brain.nii.gz", "", basename(path)), "jlf_thal_mask.nii.gz")
         }

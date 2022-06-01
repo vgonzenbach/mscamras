@@ -2,12 +2,12 @@
 module load ANTs2/2.2.0-111
 
 # Script takes a skull-stripped T1 image as argument
-mode=$(echo $1 | tr A-Z
+mode=$1
 t1=$2
 dir="$(dirname $t1)"/../JLF_"$mode"/"$(basename $t1 .nii.gz)"
 
 declare -a atlas
-declare -a wmgm
+declare -a seg
 
 # Fill arrays
 for i in {0..9}; do
