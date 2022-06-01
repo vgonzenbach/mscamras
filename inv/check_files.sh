@@ -129,6 +129,7 @@ for image in $(ls /project/mscamras/gadgetron/datasets-new/*/*/*.nii.gz); do
     # Check file existence
     if [ ! -e $file ]; then 
         MISSING_FILES+=($file)
+
     elif [ "$preproc" == "JLF_thal" ] || [ "$preproc" == "JLF_WMGM" ] ; then
             #reg_files=$(find $file -type f || true)
             if [ ! $(find $file -type f | wc -l) -eq 20 ]; then
