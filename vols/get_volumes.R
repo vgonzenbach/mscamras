@@ -29,7 +29,7 @@ load.t1.df = function(){
     #df[, "original"] = NULL
     colnames(df)[length(df)] = 'source_path'
     if (mode == 'gadgetron'){
-        df[, 'source_path'] = sprintf("%s_n4_brain.nii.gz", neurobase::nii.stub(df$source_path))
+        df[, 'source_path'] = sprintf("%s_brain_n4.nii.gz", neurobase::nii.stub(df$source_path))
     } else if (mode == 'onscanner'){
         df[, 'source_path'] = sprintf("%s_n4_brain.nii.gz", gsub("NIFTI", "analysis/mass", neurobase::nii.stub(df$source_path)))
     }
@@ -43,7 +43,7 @@ get.vol = function(path, type="Atropos"){
     if (type == "Atropos"){
 
         if (mode == 'gadgetron'){
-            seg_path = file.path(dirname(path), "..", "Atropos", paste0(neurobase::nii.stub(basename(path)), "_atropos_seg.nii.gz"))
+            seg_path = file.path(dirname(path), "Atropos", paste0(neurobase::nii.stub(basename(path)), "_atropos_seg.nii.gz"))
 
         } else if (mode == 'onscanner'){
             seg_path = file.path(dirname(path), "..", "Atropos", gsub("_brain.nii.gz", "", basename(path)), paste0(neurobase::nii.stub(gsub("_brain.nii.gz", "", basename(path))), "_atropos_seg.nii.gz"))
@@ -64,7 +64,7 @@ get.vol = function(path, type="Atropos"){
     } else if (type == "FAST"){
 
         if (mode == 'gadgetron'){
-            seg_path = file.path(dirname(path), "..", "FAST", paste0(neurobase::nii.stub(basename(path)), "_seg.nii.gz"))
+            seg_path = file.path(dirname(path), "FAST", paste0(neurobase::nii.stub(basename(path)), "_seg.nii.gz"))
         } else if (mode == 'onscanner'){
             seg_path = file.path(dirname(path), "..", "FAST", gsub("_brain.nii.gz", "", basename(path)), paste0(neurobase::nii.stub(basename(path)), "_seg.nii.gz"))
         }
@@ -83,7 +83,7 @@ get.vol = function(path, type="Atropos"){
     } else if (type == "JLF"){
 
         if (mode == 'gadgetron'){
-            seg_path = file.path(dirname(path), "..", "JLF_WMGM", neurobase::nii.stub(basename(path)), "fused_wmgm_seg.nii.gz")
+            seg_path = file.path(dirname(path), "JLF_WMGM", neurobase::nii.stub(basename(path)), "fused_WMGM_seg.nii.gz")
         } else if (mode == 'onscanner'){
             seg_path = file.path(dirname(path), "..", "JLF_WMGM", gsub("_brain.nii.gz", "", basename(path)), "jlf_wmgm_mask.nii.gz")
         
@@ -112,7 +112,7 @@ get.vol = function(path, type="Atropos"){
     } else if (type == "FIRST"){
 
         if (mode == 'gadgetron'){
-            seg_path = file.path(dirname(path), "..", "FIRST", paste0(neurobase::nii.stub(basename(path)), "_all_none_firstseg.nii.gz"))
+            seg_path = file.path(dirname(path), "FIRST", paste0(neurobase::nii.stub(basename(path)), "_all_none_firstseg.nii.gz"))
         } else if (mode == 'onscanner'){
             seg_path = file.path(dirname(path), "..", "FIRST", gsub("_brain.nii.gz", "", basename(path)), paste0(neurobase::nii.stub(basename(path)), "_thalamus_all_none_firstseg.nii.gz"))
         }
@@ -128,7 +128,7 @@ get.vol = function(path, type="Atropos"){
     } else if (type == "JLF_thal"){
 
         if (mode == 'gadgetron'){
-            seg_path = file.path(dirname(path), "..", "JLF_thal", neurobase::nii.stub(basename(path)), "fused_thal_seg.nii.gz")
+            seg_path = file.path(dirname(path), "JLF_thal", neurobase::nii.stub(basename(path)), "fused_thal_seg.nii.gz")
         } else if (mode == 'onscanner'){
             seg_path = file.path(dirname(path), "..", "JLF_thal",  gsub("_brain.nii.gz", "", basename(path)), "jlf_thal_mask.nii.gz")
         }
@@ -144,7 +144,7 @@ get.vol = function(path, type="Atropos"){
     } else if (type == "mimosa"){
 
         if (mode == 'gadgetron'){
-            seg_path = file.path(dirname(path), "..", "mimosa", neurobase::nii.stub(basename(path)), "bin_mask_0.2.nii.gz")
+            seg_path = file.path(dirname(path), "mimosa", neurobase::nii.stub(basename(path)), "bin_mask_0.2.nii.gz")
         } else if (mode == 'onscanner'){
             if (grepl('ND_', path)){
                 seg_path = file.path(dirname(path), "..", "mimosa_ND", 'scan1_mimosa_binary_mask_0.2_ND.nii.gz')
