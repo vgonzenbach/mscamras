@@ -15,7 +15,11 @@ for t1 in $(find /project/mscamras/gadgetron/datasets-new/ -name *brain_n4.nii.g
         mkdir -p $out_dir
         bsub -m "pennsive01 pennsive03 pennsive04 pennsive05 silver01 amber04" -J first_"$i" -o logs/first.log -e logs/first.log \
             run_first_all -b -s L_Accu,L_Amyg,L_Caud,L_Hipp,L_Pall,L_Puta,L_Thal,R_Accu,R_Amyg,R_Caud,R_Hipp,R_Pall,R_Puta,R_Thal \
+<<<<<<< HEAD
             -i "$t1" -o "$out_dir"/$(basename $t1 .nii.gz)
+=======
+            -i "$t1" -o "$out_dir"/$(basename t1 .nii.gz)
+>>>>>>> Refactor FIRST
         ((++i))
     fi
 done
