@@ -7,3 +7,4 @@ tmp/
 old/
 *.csv
 *.txt
+results/
