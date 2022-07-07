@@ -16,8 +16,8 @@ if ( (mode != 'gadgetron') && (mode != 'onscanner')){
 }
 
 jlf_dict = readxl::read_xlsx('/home/vgonzenb/MSKIDS/data/MUSE_ROI_Dict.xlsx')
-jlf_dict = jlf_dict[jlf_dict$ROI_INDEX %in% 1:200, ]
-tissue_ind = lapply(c("GM","WM"), function(x) jlf_dict$ROI_INDEX[jlf_dict$TISSUE_SEG == x])
+jlf_dict = jlf_dict[jlf_dict$ROI_INDEX %in% 1:207, ]
+tissue_ind = lapply(c("WM","GM"), function(x) jlf_dict$ROI_INDEX[jlf_dict$TISSUE_SEG == x])
 
 load.t1.df = function(){
     df = read.csv('file_list.csv')
@@ -70,14 +70,13 @@ get.vol = function(path, type="Atropos"){
         }
         out = tryCatch({
             seg = neurobase::readnii(seg_path) # Load image
-            vol_table = sum(table(seg)[c(2,3)] * voxres(seg, units = "cm")) # Get volumes for each label
+            vol_table = sum(table(seg)[c("2", "3")] * voxres(seg, units = "cm")) # Get volumes for each label
             vol_df = data.frame(t(matrix(vol_table)))
             colnames(vol_df) = paste(type, c("TBV"), sep="_")
             vol_df
 
         }, error = function(cond) {
-            vol_df = data.frame(matrix(NA, 1, 3))
-            colnames(vol_df) = paste(type, c("CSF", "GM", "WM"), sep="_")
+            vol_df = data.frame(FAST_TBV = NA)
             return(vol_df)
         })
     } else if (type == "JLF"){
@@ -101,12 +100,12 @@ get.vol = function(path, type="Atropos"){
             }
             
             vol_df = data.frame(t(matrix(vols)))
-            colnames(vol_df) = paste(type, c("GM", "WM"), sep="_")
+            colnames(vol_df) = paste(type, c("WM", "GM"), sep="_")
             vol_df
         
         }, error = function(cond) {
             vol_df = data.frame(matrix(NA, 1, 2))
-            colnames(vol_df) = paste(type, c("GM", "WM"), sep="_")
+            colnames(vol_df) = paste(type, c("WM", "GM"), sep="_")
             return(vol_df)
         })
     } else if (type == "FIRST"){
@@ -169,12 +168,11 @@ get.vol = function(path, type="Atropos"){
 
 get.vols = function(path){
     df = data.frame(source_path = path,
-               get.vol(path, "Atropos"),
-               get.vol(path, "FAST"),
                get.vol(path, "JLF"),
                get.vol(path, "FIRST"),
                get.vol(path, "JLF_thal"),
                get.vol(path, "mimosa"),
+               get.vol(path, "FAST"),
                row.names = NULL)
     return(df)
 }
