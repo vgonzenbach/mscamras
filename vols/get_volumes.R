@@ -70,9 +70,9 @@ get.vol = function(path, type="Atropos"){
         }
         out = tryCatch({
             seg = neurobase::readnii(seg_path) # Load image
-            vol_table = table(seg)[-1] * voxres(seg, units = "cm") # Get volumes for each label
+            vol_table = sum(table(seg)[c(2,3)] * voxres(seg, units = "cm")) # Get volumes for each label
             vol_df = data.frame(t(matrix(vol_table)))
-            colnames(vol_df) = paste(type, c("CSF", "GM", "WM"), sep="_")
+            colnames(vol_df) = paste(type, c("TBV"), sep="_")
             vol_df
 
         }, error = function(cond) {
