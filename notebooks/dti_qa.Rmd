@@ -1,0 +1,89 @@
+---
+title: "DTI Quality Assessment MSCAMRAS"
+author: "Virgilio Gonzenbach"
+date: '2022-08-18'
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    theme: spacelab
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Data
+```{r, warning=FALSE, message=FALSE}
+library(dplyr)
+library(ggplot2)
+
+load.data = function(){
+  df = read.table(here::here('results/dti_qa/dti_qa.tsv'))
+  # take first row as column name and drop it
+  col_names = df[1, ]
+  df = df[-1, ]
+  # set names
+  colnames(df) = col_names
+  
+
+  
+  # Create new columns
+  df$site = df$inputfile %>% sapply(function(x) strsplit(x, "/")[[1]][7]) %>% unname() %>% stringr::str_replace("ses-", '') %>% as.factor()
+  df$subj = df$inputfile %>% sapply(function(x) strsplit(x, "/")[[1]][6]) %>% unname() %>% stringr::str_replace("sub-", '') %>% as.factor()
+  df$visit = basename(df$inputfile) %>% stringr::str_extract("run-[0-9]+") %>% stringr::str_replace("run-", '') %>% as.factor()
+  df$direction = basename(df$inputfile) %>% stringr::str_extract("dir-[A-Z|a-z]+") %>% stringr::str_replace("dir-", '') %>% as.factor()
+  
+  # Drop columns
+  df$modulename = NULL
+  df$version = NULL
+  df$inputfile = NULL
+  
+  # Rearrange cols
+  left_df = df %>% select(subj, site, visit, direction)
+  
+  # Transformt to numeric
+  numerics = df %>% select(where(is.character), -outlist) %>% colnames()
+  right_df = df[, numerics] %>% lapply(as.numeric) %>% as.data.frame()
+  df = cbind(left_df, right_df)
+  return(df)
+}
+
+df = load.data()
+df 
+```
+### Images per site: 
+
+```{r}
+df %>% count(site)
+```
+
+
+## TSNR
+
+
+```{r}
+# TODO: complete the function
+plot_value = function(value) {
+  df %>% ggplot(aes_string(x='subj',y=value, color='site')) + geom_jitter() + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  }
+```
+
+```{r}
+df %>% ggplot(aes(x=subj,y=tsnr, color=site)) + geom_jitter() + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Mean ABS RMS
+
+```{r}
+df %>% ggplot(aes(x=subj,y=maxABSrms, color=site)) + geom_jitter() + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Outmax
+
+```{r}
+df %>% ggplot(aes(x=subj,y=outmax, color=site)) + geom_jitter() + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
