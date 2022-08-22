@@ -1,0 +1,331 @@
+---
+title: "Examining site effects in gadgetron volumes (v3)"
+author: "Virgilio Gonzenbach"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    theme: united
+    toc: True
+    toc_float: True
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE)
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+```
+
+```{r, warning=FALSE}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(kableExtra)
+
+df = read.csv('data/gadgetron_volumes_v3.3.csv', stringsAsFactors = TRUE, row.names = NULL)
+df$source_path = NULL
+df$X = NULL
+vol.names = df %>% select(where(is.numeric)) %>% colnames
+#qc_df = readxl::read_xlsx('data/mprage_skull_strip_QC.xlsx', sheet=1)
+#qc_df = qc_df[rowSums(is.na.data.frame(qc_df)) <= 2,] # Exclude bottom rows
+```
+
+## Data summary
+
+### Raw Data Tally
+
+We are missing 3 raw data files in total that we **should** have:
+
+```{r}
+raw_tally_df = read.csv('tally_raw_data.csv')
+raw_tally_df
+```
+
+Note: subject 03-001 was not scanned at NIH site; subject 03-002 was not scanned at Penn.
+
+### Total visits per subjects
+
+```{r}
+df %>% count(ID, img_type) # %>% select(-img_source, -source_path) %>% count()
+```
+
+### Scans at site per subject
+
+```{r}
+subj_df_list = split(df, df$ID)
+subj_df_list %>% sapply(function(df) table(df[, "site"])) %>% t() %>% as.data.frame()
+```
+
+### Missing segmentations
+
+Showing only segmentation types with at least 1 file missing.
+
+```{r}
+miss_vol = as.data.frame(is.na.data.frame(select(df, all_of(vol.names)))) 
+row_filter = rowSums(miss_vol) > 0 # Sum TRUE values
+col_filter = names(which(colSums(miss_vol) > 0)) 
+
+# Transform to character values
+miss_vol = miss_vol %>%  lapply(function(x) as.character(x) %>% dplyr::recode(`TRUE` = 'MISSING', `FALSE` = '')) %>% bind_cols
+miss_df = cbind(select(df, -all_of(vol.names)), miss_vol) %>% filter(row_filter) %>% select(-all_of(setdiff(vol.names, col_filter)))
+
+miss_df
+```
+
+## Segmentation volumetrics
+
+```{r}
+# Load onscanner data
+onsc_df = read.csv('data/onscanner_volumes.csv')
+```
+
+```{r, warning=FALSE}
+local.vols = c('mimosa', 'JLF_thal', 'FIRST_thal')
+global.vols = setdiff(vol.names, local.vols)
+  
+
+plot.vols = function(df, filt, color='ID'){
+  df %>% pivot_longer(cols=vol.names, names_to = "segmentation", values_to = "cm") %>% filter(segmentation %in% filt) %>% ggplot(aes(x=segmentation, y=cm, color = ID)) + geom_jitter() + facet_grid(~site) + coord_flip()
+  
+}  
+
+p = plot.vols(df, global.vols)
+p + ggtitle("Global Volumes (Gadgetron)") + theme(plot.title = element_text(hjust = 0.5)) + ylim(0,1200)
+```
+
+```{r,  warning=FALSE}
+p = plot.vols(onsc_df, global.vols)
+p + ggtitle("Global Volumes (Onscanner)") + theme(plot.title = element_text(hjust = 0.5)) + ylim(0,1200)
+```
+
+```{r, warning=FALSE}
+p = plot.vols(df, local.vols)
+p + ggtitle("Local Volumes (Gadgetron)") + theme(plot.title = element_text(hjust = 0.5))+ ylim(0, 80)
+```
+
+```{r, warning=FALSE}
+p = plot.vols(onsc_df, local.vols)
+p + ggtitle("Local Volumes (Onscanner)") + theme(plot.title = element_text(hjust = 0.5)) + ylim(0, 80)
+```
+
+## Site effects
+
+```{r, warning=FALSE}
+get.r.sq = function(df){
+
+ r.sq = numeric(0)
+ for (v in vol.names) { # global vol.names
+   # deal with NAs
+   res = tryCatch(summary(lm(df[,v ] ~ df$site))$r.squared, error = function(cond) return(NA))
+   r.sq = c(r.sq, res)
+ }
+ names(r.sq) = vol.names
+ return(r.sq)
+}
+
+# Get r-sq for gadgetron recons
+R.sq.df = subj_df_list %>% 
+  lapply(get.r.sq) %>% 
+  bind_rows(.id='ID') %>% 
+  tibble::add_column(recon = 'gadgetron', .before = "ID")
+
+R.sq.df = split(onsc_df, f= onsc_df$ID) %>% 
+  lapply(get.r.sq) %>% 
+  bind_rows(.id='ID') %>% 
+  tibble::add_column(recon = 'onscanner', .before = "ID") %>% 
+  rbind(R.sq.df)
+
+R.sq.df %>% 
+  pivot_longer(cols=vol.names, names_to = "segmentation", values_to = "R.squared") %>% 
+  ggplot(aes(x=segmentation, y=R.squared, color = recon)) + 
+  geom_boxplot() + 
+  coord_flip() + 
+  ggtitle("R squared values of site effects") + 
+  theme(plot.title = element_text(hjust = 0.5))
+# R.sq.df %>% 
+#   pivot_longer(cols=vol.names, names_to = "segmentation", values_to = "R.squared") %>% 
+#   ggplot(aes(x=segmentation, y=R.squared, color = ID)) + 
+#   geom_boxplot(aes(x=segmentation, y=R.squared, color = NULL)) +
+#   geom_jitter() +
+#   coord_flip() +
+#   ggtitle("R squared values of site effects (Gadgetron)") + theme(plot.title = element_text(hjust = 0.5))
+```
+
+Paired t-tests didnot find a significant difference.
+
+```{r}
+vol.names %>% lapply(function(x) t.test(reformulate("recon", x), data = subset(R.sq.df, recon %in% c("onscanner", "gadgetron")), paired = TRUE))
+```
+
+## Permutation Testing
+
+### Gadgetron Volumes
+
+pseudo-F Ratio statistics: Intersite Variability / Intrasite Variability
+
+```{r}
+gadg_ratio = readRDS("results/gadgetron_volumes_v3.3_ratio_stat.rds")
+gadg_null = readRDS("results/gadgetron_volumes_v3.3_null.rds")
+gadg_ratio$X = NULL
+gadg_ratio
+```
+
+Distribution of permutated pseudo-F stats:
+
+```{r, warning=FALSE}
+gadg_null %>% pivot_longer(everything()) %>% ggplot(aes(x=name, y=value)) + geom_violin(draw_quantiles = c(0.95)) + geom_point(aes(x=name, y=value), data = gadg_ratio %>% pivot_longer(everything())) + coord_flip()
+```
+
+P-value of pseudo-F stat:
+
+```{r}
+test_ratio_stat = function(ratio.stats, null.dists){
+  p.vals = c()
+  for (col in colnames(ratio.stats)){
+    ratio.stat = ratio.stats[, col]
+    null.dist = null.dists[, col]
+    
+    percentile = ecdf(null.dist)
+    p.vals = c(p.vals, percentile(ratio.stat))
+  }
+  names(p.vals) = colnames(ratio.stats)
+  return(p.vals)
+}
+
+p = 1 - test_ratio_stat(gadg_ratio, gadg_null)
+(10000*p + 1)/(1+10000)
+```
+
+### Onscanner Volumes
+
+pseudo-F statistics: Intersite Variability / Intrasite Variability
+
+```{r}
+onsc_ratio = readRDS("results/onscanner_volumes_ratio_stat.rds")
+onsc_null = readRDS("results/onscanner_volumes_null.rds")
+
+onsc_ratio
+```
+
+Distribution of permutated pseudo-F stats:
+
+```{r, warning=FALSE}
+onsc_null %>% pivot_longer(everything()) %>% ggplot(aes(x=name, y=value)) + geom_violin(draw_quantiles = c(0.95)) + geom_point(aes(x=name, y=value), data = pivot_longer(onsc_ratio, everything())) + coord_flip()
+```
+
+P-value of pseudo-F stat:
+
+```{r}
+p = 1 - test_ratio_stat(onsc_ratio, onsc_null)
+(10000*p + 1)/(1+10000)
+```
+
+## Mixed Models
+
+```{r, warning=FALSE, message=FALSE}
+library(lme4)
+library(dplyr)
+library(sjPlot)
+library(jtools)
+library(rlang)
+library(EMAtools)
+library(car)
+
+#Mixed Effects Model, random effect term for subject and another random effect term that nests site within subject
+gadg_df = df
+
+run_mixed_models = function(vol_df){
+  
+  vols = vol_df %>% select(where(is.numeric)) %>% colnames
+  models = list()
+  for (vol in vols){ 
+    x = vol_df[, vol]
+    assign(vol, x)
+    message(sprintf("Ran mixed model for %s", vol))
+    model = lmer(reformulate(" (1|ID) + (1|site:ID)", vol), data = vol_df)
+    models = c(models, model)
+  }
+  names(models) = vols 
+  return(models)
+}
+
+gadg_models = run_mixed_models(gadg_df)
+gadg_ICC_df = gadg_models %>% lapply(performance::icc, by_group = TRUE) %>% bind_rows(.id = "volume") %>% pivot_longer(everything(), names_to = "volume", values_to = "ICC")
+gadg_ICC_df = data.frame(volume = gadg_ICC_df$volume, Group = gadg_ICC_df$ICC$Group, ICC = gadg_ICC_df$ICC$ICC) %>% drop_na()
+
+onsc_models = run_mixed_models(onsc_df)
+onsc_ICC_df = onsc_models %>% lapply(performance::icc, by_group = TRUE) %>% bind_rows(.id = "volume") %>% as.data.frame()
+#onsc_ICC_df = data.frame(volume = onsc_ICC_df$name, Group = onsc_ICC_df$value$Group, value = onsc_ICC_df$value$ICC) %>% drop_na()
+```
+
+```{r}
+gadg_models %>% lapply(summary)
+```
+
+### ICC of Subject Random Effect
+
+```{r, warning=FALSE}
+gadg_ICC_df %>% filter(Group == 'ID') %>% ggplot(aes(x=volume, y=ICC)) + geom_point() + coord_flip() + ggtitle("ICC from Gadgetron Volumes") + ylim(0,1)
+onsc_ICC_df %>% filter(Group == 'ID') %>% ggplot(aes(x=volume, y=ICC)) + geom_point() + coord_flip() + ggtitle("ICC from Onscanner Volumes") + ylim(0,1)
+```
+
+### ICC of Site:Subject Random Effect
+
+```{r, warning=FALSE}
+gadg_ICC_df %>% filter(Group == 'site:ID') %>% ggplot(aes(x=volume, y=ICC)) + geom_point() + coord_flip() + ggtitle("ICC from Gadgetron Volumes") + ylim(0,1)
+
+onsc_ICC_df %>% filter(Group == 'site:ID') %>% ggplot(aes(x=volume, y=ICC)) + geom_point() + coord_flip() + ggtitle("ICC from Onscanner Volumes") + ylim(0,1)
+```
+
+## Mixed model Diagnostics
+
+### FAST TBV
+
+```{r, warning=FALSE}
+perf_mixed_model = function(model){
+  
+  list(summary = summary(model),
+       perf = performance::icc(model, by_group = TRUE),
+       shapiro.resid = shapiro.test(residuals(model)),
+       qq.resid = car::qqPlot(residuals(model),dist="norm", main="Residuals"),
+       shapiro.ID = shapiro.test(coef(model)$`ID`[,1]),
+       `shapiro.site:ID` = shapiro.test(coef(model)$`site:ID`[,1]),
+       
+       qq.ranef.ID = car::qqPlot(ranef(model)$ID[,1],dist="norm", main="Rand. Eff. ID"),
+       `qq.ranef.site:ID` = car::qqPlot(ranef(model)$`site:ID`[,1],dist="norm", main="Rand. Eff. Site:ID"),
+       res.v.fit = ggplot(mapping = aes(y = resid(model), x = fitted(model))) + geom_abline(intercept = 0, slope = 0) + geom_point() + geom_smooth() + theme_bw()
+       )
+}
+
+models = gadg_models
+perf_mixed_model(models$FAST_TBV)
+```
+
+### JLF GM
+
+```{r}
+perf_mixed_model(models$JLF_GM)
+```
+
+### JLF WM
+
+```{r}
+perf_mixed_model(models$JLF_WM)
+```
+
+### FIRST thal
+
+```{r}
+perf_mixed_model(models$FIRST_thal)
+```
+
+### JLF thal
+
+```{r}
+perf_mixed_model(models$JLF_thal)
+```
+
+### Mimosa
+
+```{r}
+perf_mixed_model(models$mimosa)
+```
