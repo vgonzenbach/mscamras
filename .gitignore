@@ -5,3 +5,10 @@
 logs/
 tmp/
 old/
+<<<<<<< Updated upstream
+=======
+*.csv
+*.txt
+results/
+data/
+>>>>>>> Stashed changes
