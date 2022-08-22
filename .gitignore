@@ -7,6 +7,8 @@ tmp/
 old/
 *.csv
 *.txt
+*.tsv
 results/
 data/
 work/
+dti/qa/
