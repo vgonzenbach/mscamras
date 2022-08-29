@@ -62,3 +62,11 @@ for f in $(ls /project/mscamras/Data/*/*/NIFTI/* | grep -E 'MPRAGE|FLAIR|DTI' | 
     fi
     unset -v subj ses acq run
 done
+
+echo '{
+  "Name": "MS CAMRAS: Studying Site effects in MS Neuroimaging",
+  "BIDSVersion": "1.9.6",
+  "Authors": ["Penn Statistics in Imaging and Visualization Endeavor (PennSIVE)", "Organized by Virgilio Gonzenbach"]
+}'
+
+mkdir -p data/derivatives
