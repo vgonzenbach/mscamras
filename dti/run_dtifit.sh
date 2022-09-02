@@ -4,15 +4,15 @@ module load fsl
 cd $(dirname $0)/..
 pwd
 
-for dwi in $(ls data/derivatives/qsiprep/sub-*/ses-*/dwi/*dwi.nii.gz); do
+for dwi in $(ls data/derivatives/qsiprep/sub-*/dwi/*dwi.nii.gz); do
     mask=$(echo $dwi | sed 's/preproc_dwi/brain_mask/g')
     bval=${dwi%%.*}.bval # use parameter expansion to reassign extension
     bvec=${dwi%%.*}.bvec
     cni=$(echo ${dwi%%.*} | sed 's/space-T1w_desc-preproc_dwi/confounds/g').tsv
 
-    sub=$(echo $dwi | grep -Eo sub-[0-9]+ | head -n1)
-    ses=$(echo $dwi | grep -Eo ses-[A-Za-z]+ | head -n1)
-    out=data/derivatives/dtifit/$sub/$ses/dwi/$(basename $dwi _dwi.nii.gz)
+    sub=$(echo $dwi | grep -Eo sub-[A-Za-z0-9]+ | grep -Eo [0-9]+ | head -n1)
+    #ses=$(echo $dwi | grep -Eo ses-[A-Za-z]+ | grep -Eo [0-9]+ | head -n1)
+    out=data/derivatives/dtifit/sub-$sub/dwi/$(basename $dwi _dwi.nii.gz)
     mkdir -p $(dirname $out)
     bsub dtifit --data=$dwi \
         --out=$out \

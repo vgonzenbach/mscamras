@@ -5,7 +5,7 @@ shopt -s extglob
 
 for img in $(ls data/derivatives/qsiprep/sub-*/anat/sub-+([0123456789])_desc-preproc_T1w.nii.gz ); do
     
-    outdir=$(dirname $img | sed 's/qsiprep/jlf_seg/g')
+    outdir=$(dirname $img | sed 's/qsiprep/jlfseg/g')
     mkdir -p $outdir
 
     outimg=${outdir}/$(basename $img .nii.gz | grep -Eo "sub-[0-9]+")_space-T1w_dseg.nii.gz

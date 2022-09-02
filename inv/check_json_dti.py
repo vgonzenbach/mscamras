@@ -1,7 +1,7 @@
 import os
 import sys
 import json
-from glob import glob
+from bids import BIDSLayout
 import pandas as pd
 
 # Set working directory
@@ -10,7 +10,8 @@ os.chdir(WORKDIR)
 
 """Check which jsons are missing 'PhaseEncodingDirection' attribute"""
 # read in all filename
-dwi_filenames = glob(f'data/*/*/dwi/*json')
+layout = BIDSLayout('data')
+dwi_filenames = [ BIDSJSONFile.path for BIDSJSONFile in layout.get(suffix='dwi', extension='.json') ]
 dwi_jsons = {}
 for fn in dwi_filenames:
     with open(fn) as f:
