@@ -7,8 +7,8 @@ mkdir -p data
 #2 translate path to a bids path
 #3 make symbolic links
 
-dest_dir="$1" # destination directory .i.e path with name of the dataset
-copy_type="$2" # '--hard' for hard copy or '--sym' for symbolic link
+#dest_dir="$1" # destination directory .i.e path with name of the dataset
+copy_type="$1" # '--hard' for hard copy or '--sym' for symbolic link
 # populate mprages
 for f in $(ls /project/mscamras/Data/*/*/NIFTI/* | grep -E 'MPRAGE|FLAIR|DTI' | grep -Ev 'Mono|SAG_T[1-2]|SAG_3D'); do
     
@@ -24,19 +24,15 @@ for f in $(ls /project/mscamras/Data/*/*/NIFTI/* | grep -E 'MPRAGE|FLAIR|DTI' | 
         run='01'
     fi
 
-    if [[ "$filename" =~ ND$ || "$filename" =~ NDa$ ]]; then
-        acq='ND'
-    else
-        acq='D'
-    fi
-
     # translate filepaths to BIDS
+    # for anatomical images only transfer ND acquisition
+    if [[ "$filename" =~ MPRAGE && ( "$filename" =~ ND$ || "$filename" =~ NDa$ ) ]]; then
+        acq='ND'
+        bids_file=data/sub-"$subj""$ses""$run"/anat/sub-"$subj""$ses""$run"_acq-"$acq"_T1w."$ext"
 
-    if [[ "$filename" =~ MPRAGE ]]; then
-        bids_file=data/sub-"$subj"/ses-"$ses"/anat/sub-"$subj"_ses-"$ses"_acq-"$acq"_run-"$run"_T1w."$ext"
-
-    elif [[ "$filename" =~ FLAIR ]]; then
-        bids_file=data/sub-"$subj"/ses-"$ses"/anat/sub-"$subj"_ses-"$ses"_acq-"$acq"_run-"$run"_T2w."$ext"
+    elif [[ "$filename" =~ FLAIR && ( "$filename" =~ ND$ || "$filename" =~ NDa$ ) ]]; then
+        acq='ND'
+        bids_file=data/sub-"$subj""$ses""$run"/anat/sub-"$subj""$ses""$run"_acq-"$acq"_T2w."$ext"
 
     elif [[ "$filename" =~ DTI ]]; then
         acq=''
@@ -46,17 +42,19 @@ for f in $(ls /project/mscamras/Data/*/*/NIFTI/* | grep -E 'MPRAGE|FLAIR|DTI' | 
             dir="AX"
         fi
 
-        bids_file="$dest_dir"/sub-"$subj"/ses-"$ses"/dwi/sub-"$subj"_ses-"$ses"_dir-"$dir"_run-"$run"_dwi."$ext"
+        bids_file=data/sub-"$subj""$ses""$run"/dwi/sub-"$subj""$ses""$run"_dir-"$dir"_dwi."$ext"
     fi
 
-    echo "$subj" "$ses" "$acq" "$run" "$filename"
+    #echo "$subj" "$ses" "$acq" "$run" "$filename"
     mkdir -p $(dirname $bids_file)
 
     # decide what kind of copy to do based on 2nd parameter
     if [ $copy_type == "--sym" ]; then
+        echo "Linking $f to $bids_file"
         ln -s $f $bids_file
 
     elif [ $copy_type == "--hard" ]; then
+        echo "Copying $f to $bids_file"
         cp $f $bids_file
 
     fi
@@ -67,6 +65,6 @@ echo '{
   "Name": "MS CAMRAS: Studying Site effects in MS Neuroimaging",
   "BIDSVersion": "1.9.6",
   "Authors": ["Penn Statistics in Imaging and Visualization Endeavor (PennSIVE)", "Organized by Virgilio Gonzenbach"]
-}'
+}' > data/dataset_description.json
 
 mkdir -p data/derivatives
