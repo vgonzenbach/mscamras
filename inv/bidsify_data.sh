@@ -78,3 +78,6 @@ echo '{
 
 # Make folder for pipelines
 mkdir -p data/derivatives
+
+# Delete 02001NIH01 and 02001NIH02 since DTI missing
+rm -r data/sub-02001NIH0*
