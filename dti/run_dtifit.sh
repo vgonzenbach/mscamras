@@ -2,7 +2,6 @@
 # Run DTIfit on data preprocessed by qsiprep
 module load fsl
 cd $(dirname $0)/..
-pwd
 
 for dwi in $(ls data/derivatives/qsiprep/sub-*/dwi/*dwi.nii.gz); do
     mask=$(echo $dwi | sed 's/preproc_dwi/brain_mask/g')
