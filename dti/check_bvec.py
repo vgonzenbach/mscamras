@@ -6,7 +6,7 @@ WORKDIR = os.path.join(os.path.dirname(__file__), '..')
 os.chdir(WORKDIR)
 
 bvecs = []
-for f in glob('data/sub-*/ses-*/dwi/sub-*_ses-*_dwi.bvec'):
+for f in glob('data/sub-*/dwi/sub-*_dwi.bvec'):
     bvec = np.loadtxt(f)
     #print(f.split('/')[2]) # print site
     #print(np.sum(bvec.shape))
