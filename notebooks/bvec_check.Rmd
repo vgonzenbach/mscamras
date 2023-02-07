@@ -1,0 +1,211 @@
+---
+title: "DTI MSCAMRAS: QSIPREP run troubleshooting"
+author: "Virgilio Gonzenbach"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    code_folding: hide
+    toc_float: true
+    theme: spacelab
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+# Bval and Bvec checks
+
+```{r}
+library(dplyr)
+library(stringr)
+library(purrr)
+
+# get bvec and bval paths
+bvec_filepaths <- Sys.glob(here::here("data/sub-*/dwi/*.bvec"))
+bval_filepaths <- Sys.glob(here::here("data/sub-*/dwi/*.bval"))
+
+# check that they are the same except for extension. then make data.frame
+if ( all(tools::file_path_sans_ext(bvec_filepaths) == tools::file_path_sans_ext(bval_filepaths))){
+  bvec_df <- data.frame(bvec_path = bvec_filepaths,
+                      bval_path = bval_filepaths)
+}
+
+#' Read bvecs or bvals from file
+#' @param path the path to a bvec or bval file
+#' @return a vector of numeric values (a flattened matrix)
+read_matrix <- function(path){
+  path |>
+    read.table() |>
+    as.matrix() 
+}
+
+# parse subject, site and visit each paths
+bvec_df <- bvec_df %>% 
+  mutate(subject = str_extract(bvec_path, "(?<=sub-)\\d{5}"),
+         site = str_extract(bvec_path, "(?<=sub-\\d{5})\\D+"),
+         visit = str_extract(bvec_path, "\\d+(?=_acq)"), 
+         direction = str_extract(bvec_path, "AX|XPhase"),
+         bval = map(bval_path, read_matrix),
+         bvec = map(bvec_path, read_matrix),
+         .before = bvec_path)
+
+# How many unique values
+bvec_df %>% 
+  summarize(n_unique_bval = n_distinct(bval),
+            n_unique_bvec = n_distinct(bvec))
+```
+
+For each site, the number of distinct bval and bvec matrices varies.
+```{r}
+bvec_df %>% 
+  group_by(site) %>% 
+  distinct(bval) %>% 
+  DT::datatable()
+```
+
+```{r}
+bvec_df %>% 
+  group_by(site) %>% 
+  distinct(bvec) %>% 
+  DT::datatable()
+```
+
+
+```{r}
+bvec_df %>% 
+  group_by(site) %>% 
+  summarize(n_unique_bval = n_distinct(bval),
+            n_unique_bvec = n_distinct(bvec))
+```
+
+
+## Distincts bvals
+
+At Penn, looks like the bval values got paired incorrectly. 
+
+```{r}
+# let's look at Penn since David checked those
+bvec_df %>% 
+  filter(site == 'Penn') %>% 
+  group_by(visit, direction) %>% 
+  distinct(bval) %>% 
+  DT::datatable()
+```
+
+But they are highly correlated:
+
+```{r}
+# let's look at Penn since David checked those
+bvec_df %>% 
+  filter(site == 'Penn') %>% 
+  distinct(bval) %>% 
+  pull(bval) %>% 
+  (function(x) cor(c(x[[1]]), c(x[[2]])))
+```
+
+At Hopkins, the values appear shifted.
+
+```{r}
+bvec_df %>% 
+  filter(site == 'Hopkins') %>% 
+  distinct(bval) %>% 
+  DT::datatable()
+```
+
+The correlations is not near 1.
+
+```{r}
+bvec_df %>% 
+  filter(site == 'Hopkins') %>% 
+  distinct(bval) %>% 
+  pull(bval) %>% 
+  (function(x) cor(c(x[[1]]),
+                   c(x[[2]])))
+```
+
+At NIH, there are many different bval matrices. But they are all highly correlated (good news).
+
+```{r}
+bvec_df %>% 
+  filter(site == 'NIH') %>% 
+  distinct(bval) %>% 
+  pull(bval) %>% 
+  combn(m = 2) %>% 
+  apply(2, function(x) cor(c(x[[1]]), 
+                           c(x[[2]])))
+
+```
+
+The same is true for BWH.  
+
+```{r}
+bvec_df %>% 
+  filter(site == 'BWH') %>% 
+  distinct(bval) %>% 
+  pull(bval) %>% 
+  combn(m = 2) %>% 
+  apply(2, function(x) cor(c(x[[1]]), 
+                           c(x[[2]])))
+```
+
+
+## Bvec check
+
+```{r}
+# let's look at Penn since David checked those
+bvec_df %>% 
+  filter(site == 'Penn') %>% 
+  distinct(bvec) %>% 
+  pull(bvec) %>% 
+  (function(x) cor(c(x[[1]]), c(x[[2]])))
+```
+
+At Hopkins, the values appear shifted.
+
+```{r}
+bvec_df %>% 
+  filter(site == 'Hopkins') %>% 
+  distinct(bvec) %>% 
+  DT::datatable()
+```
+
+The correlations is not near 1.
+
+```{r}
+bvec_df %>% 
+  filter(site == 'Hopkins') %>% 
+  distinct(bvec) %>% 
+  pull(bvec) %>% 
+  (function(x) cor(c(x[[1]]),
+                   c(x[[2]])))
+```
+
+At NIH, there are many different bvec matrices. But they are all highly correlated (good news).
+
+```{r}
+bvec_df %>% 
+  filter(site == 'NIH') %>% 
+  distinct(bvec) %>% 
+  pull(bvec) %>% 
+  combn(m = 2) %>% 
+  apply(2, function(x) cor(c(x[[1]]), 
+                           c(x[[2]])))
+
+```
+
+The same is true for BWH.  
+
+```{r}
+bvec_df %>% 
+  filter(site == 'BWH') %>% 
+  distinct(bvec) %>% 
+  pull(bvec) %>% 
+  combn(m = 2) %>% 
+  apply(2, function(x) cor(c(x[[1]]), 
+                           c(x[[2]])))
+```
+
+QSIPREP was run after adjusting the bvals across site to match. 
+
