@@ -1,15 +1,22 @@
 #!/bin/bash
+if [[ $# -eq 0 ]]; then
+    echo "No arguments supplied"
+    exit
+fi
+data_version=$1
+# First (and only) argument specifies modifications to be made to the data and/or metadata
+# v0: Copy all data
+# v1: Copy the metadata without modifying file contents but remove incomplete subjects
+# v2: Modify Hopkins .json files
+# v3: Modify .bvec and .bval files for non-Hopkins data
+# v4: Modify NIH .json files
+# See docs/check_data_<version>.html for more info
 
 cd "$(dirname $0)"/..
-mkdir -p data
+data_path=data/${data_version}
+mkdir -p ${data_path}
 
-#1 pick relevant files 
-#2 translate path to a bids path
-#3 make symbolic links
-
-#dest_dir="$1" # destination directory .i.e path with name of the dataset
-copy_type="$1" # '--hard' for hard copy or '--sym' for symbolic link
-# populate mprages
+# copy files into bids format
 for f in $(ls /project/mscamras/Data/*/*/NIFTI/* | grep -E 'MPRAGE|FLAIR|DTI' | grep -Ev 'Mono|SAG_T[1-2]|SAG_3D'); do
     
     filename="${f%%.*}"
@@ -38,10 +45,10 @@ for f in $(ls /project/mscamras/Data/*/*/NIFTI/* | grep -E 'MPRAGE|FLAIR|DTI' | 
     # translate filepaths to BIDS
 
     if [[ "$filename" =~ MPRAGE ]]; then
-            bids_file=data/sub-"$subj""$ses""$run"/anat/sub-"$subj""$ses""$run"_acq-"$acq"_T1w."$ext"
+            bids_file=${data_path}/sub-"$subj""$ses""$run"/anat/sub-"$subj""$ses""$run"_acq-"$acq"_T1w."$ext"
 
         elif [[ "$filename" =~ FLAIR ]]; then
-            bids_file=data/sub-"$subj""$ses""$run"/anat/sub-"$subj""$ses""$run"_acq-"$acq"_T2w."$ext"
+            bids_file=${data_path}/sub-"$subj""$ses""$run"/anat/sub-"$subj""$ses""$run"_acq-"$acq"_T2w."$ext"
 
         elif [[ "$filename" =~ DTI ]]; then
             if [[ "$filename" =~ Pa?$|_XPhase_ ]]; then
@@ -49,35 +56,61 @@ for f in $(ls /project/mscamras/Data/*/*/NIFTI/* | grep -E 'MPRAGE|FLAIR|DTI' | 
             elif [[ "$filename" =~  Aa?$|_AX_ ]]; then
                 dir="AX"
             fi
-            bids_file=data/sub-"$subj""$ses""$run"/dwi/sub-"$subj""$ses""$run"_acq-"$acq"_dir-"$dir"_dwi."$ext"
+            bids_file=${data_path}/sub-"$subj""$ses""$run"/dwi/sub-"$subj""$ses""$run"_acq-"$acq"_dir-"$dir"_dwi."$ext"
     fi
     #echo "$subj" "$ses" "$acq" "$run" "$filename"
     mkdir -p $(dirname $bids_file)
 
-    # decide what kind of copy to do based on 2nd parameter
-    if [ $copy_type == "--sym" ]; then
-        echo "Linking $f to $bids_file"
-        ln -s $f $bids_file
+    echo "Copying $f to $bids_file"
+    cp $f $bids_file
 
-    elif [ $copy_type == "--hard" ]; then
-        echo "Copying $f to $bids_file"
-        cp $f $bids_file
-
-    fi
     unset -v subj ses acq run
 done
 
+## create top-level .json
 echo '{
   "Name": "MS CAMRAS: Studying Site effects in MS Neuroimaging",
   "BIDSVersion": "1.9.6",
   "Authors": ["Penn Statistics in Imaging and Visualization Endeavor (PennSIVE)", "Organized by Virgilio Gonzenbach"]
-}' > data/dataset_description.json
-
-# Correct .json on Hopkins data 
-~/.conda/envs/mscamras/bin/python inv/check_json_dti.py
+}' > ${data_path}/dataset_description.json
 
 # Make folder for pipelines
-mkdir -p data/derivatives
+mkdir -p ${data_path}/derivatives
 
-# Delete 02001NIH01 and 02001NIH02 since DTI missing
-rm -r data/sub-02001NIH0*
+# extract number in version number
+version_number=$(sed 's/v//g' <<< $data_version)
+
+# Delete 02001NIH01 and 02001NIH02 since DTI missing for version 0 or greater
+if [[ ${version_number} -ge 1 ]]; then
+    rm -r ${data_path}/sub-02001NIH0*
+fi
+
+# Correct .json on Hopkins data  for version 1 or greater
+if [[ ${version_number} -ge 2 ]]; then
+    .venv/bin/python3 inv/fix_json.py --fix-hopkins ${data_path}
+fi
+
+# Modify .bvec and .bval files for non-Hopkins for v2 or greater
+if [[ ${version_number} -ge 3 ]]; then
+    for site in NIH Penn BWH; do
+        bvals=($(ls ${data_path}/*${site}*/dwi/*.bval))
+        bvecs=($(ls ${data_path}/*${site}*/dwi/*.bvec))
+        
+        # chose which file to keep for the site
+        the_one_bval=${bvals[0]}
+        the_one_bvec=${bvecs[0]}
+
+        # iterate over a sequence from 1 to (length of array - 1)
+        for i in $(seq $(expr ${#bvecs[@]} - 1)); do # - 1
+            cp $the_one_bval ${bvals[i]}
+            cp $the_one_bvec ${bvecs[i]}
+        done
+
+    done 
+fi
+# Modify NIH data
+if [[ ${version_number} -ge 4 ]]; then
+    .venv/bin/python3 inv/fix_json.py --fix-nih ${data_path}
+fi
+
+echo "Database ${data_version} copied"
