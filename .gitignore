@@ -12,3 +12,4 @@ results/
 data/
 work/
 dti/qa/
+.venv/
