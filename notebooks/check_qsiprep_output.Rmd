@@ -1,0 +1,90 @@
+---
+title: "check_qsiprep_output"
+author: "Virgilio Gonzenbach"
+date: '`r Sys.Date()`'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+```
+
+# Checking qsiprep output
+
+```{r}
+library(dplyr)
+library(stringr)
+```
+
+## Checking T1s
+
+Two T1s are missing qsiprep output.
+```{r}
+raw_t1 <- system("find data/v4 -name *_T1w.nii.gz -not -path *derivatives*", intern=TRUE)
+raw_t1_df <- raw_t1 |> 
+  as.data.frame() |> 
+  setNames('t1_path') |> 
+  mutate(subject = str_extract(t1_path, "(?<=sub-)\\d{5}"),
+         site = str_extract(t1_path, "(?<=sub-\\d{5})\\D+"),
+         visit = str_extract(t1_path, "\\d+(?=_acq)"), 
+         .before = t1_path)
+
+qsiprep_t1 <- system("find data/v4/derivatives/qsiprep -name *_T1w.nii.gz -not -name *MNI*", intern=TRUE)
+qsiprep_t1_df <- qsiprep_t1 |> 
+  as.data.frame() |> 
+  setNames('t1_path') |> 
+  mutate(subject = str_extract(t1_path, "(?<=sub-)\\d{5}"),
+         site = str_extract(t1_path, "(?<=sub-\\d{5})\\D+"),
+         visit = str_extract(t1_path, "\\d+(?=_desc)"), 
+         .before = t1_path)
+
+# which T1s are missing a qsiprep output?
+anti_join(raw_t1_df, qsiprep_t1_df,  by = c("subject", "site", "visit"))    
+```
+
+```{bash}
+# first one
+cat logs/qsiprep/v4/sub-01001BWH01.log 
+```
+
+```{bash}
+cat logs/qsiprep/v4/sub-02002Hopkins02.log
+```
+
+
+## DWI
+
+There are 3 missing DWIs. In addition to the 2 runs that failed for the T1s, there is one more and we take a look.
+
+```{r}
+# get dwi paths into data.frame
+raw_dwi_paths <- Sys.glob(here::here("data/v4/sub-*/dwi/*dwi.nii.gz"))
+raw_dwi_df <- data.frame(dwi_path = raw_dwi_paths) #
+
+# parse subject, site and visit each paths
+raw_dwi_df <- raw_dwi_df %>% 
+  mutate(subject = str_extract(dwi_path, "(?<=sub-)\\d{5}"),
+         site = str_extract(dwi_path, "(?<=sub-\\d{5})\\D+"),
+         visit = str_extract(dwi_path, "\\d+(?=_acq)"), 
+         .before = dwi_path)
+
+# get dwi paths into data.frame
+qsiprep_dwi_paths <- Sys.glob(here::here("data/v4/derivatives/qsiprep/sub-*/dwi/*dwi.nii.gz"))
+qsiprep_dwi_df <- data.frame(dwi_path = qsiprep_dwi_paths) #
+
+# parse subject, site and visit each paths
+qsiprep_dwi_df <- qsiprep_dwi_df %>% 
+  mutate(subject = str_extract(dwi_path, "(?<=sub-)\\d{5}"),
+         site = str_extract(dwi_path, "(?<=sub-\\d{5})\\D+"),
+         visit = str_extract(dwi_path, "\\d+(?=_acq)"), 
+         .before = dwi_path)
+
+raw_dwi_df |> 
+  anti_join(qsiprep_dwi_df, by = c('subject', 'site', 'visit')) 
+```
+
+```{bash}
+cat logs/qsiprep/v4/sub-01003Hopkins02.log
+```
+

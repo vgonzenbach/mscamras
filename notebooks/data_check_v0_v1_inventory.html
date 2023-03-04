@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+<meta name="author" content="Virgilio Gonzenbach" />
+
+
+<title>Data Check v0 and v1: Inventory</title>
+
+<script src="data_check_v0_v1_inventory_files/header-attrs-2.11/header-attrs.js"></script>
+<script src="data_check_v0_v1_inventory_files/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="data_check_v0_v1_inventory_files/bootstrap-3.3.5/css/cosmo.min.css" rel="stylesheet" />
+<script src="data_check_v0_v1_inventory_files/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="data_check_v0_v1_inventory_files/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="data_check_v0_v1_inventory_files/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="data_check_v0_v1_inventory_files/jqueryui-1.11.4/jquery-ui.min.js"></script>
+<link href="data_check_v0_v1_inventory_files/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="data_check_v0_v1_inventory_files/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="data_check_v0_v1_inventory_files/navigation-1.1/tabsets.js"></script>
+<script src="data_check_v0_v1_inventory_files/navigation-1.1/codefolding.js"></script>
+<link href="data_check_v0_v1_inventory_files/highlightjs-9.12.0/textmate.css" rel="stylesheet" />
+<script src="data_check_v0_v1_inventory_files/highlightjs-9.12.0/highlight.js"></script>
+<link href="data_check_v0_v1_inventory_files/pagedtable-1.1/css/pagedtable.css" rel="stylesheet" />
+<script src="data_check_v0_v1_inventory_files/pagedtable-1.1/js/pagedtable.js"></script>
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+<style type="text/css">code{white-space: pre;}</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+
+
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+pre code {
+  padding: 0;
+}
+</style>
+
+
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "&#xe258;";
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+<style type="text/css">
+.code-folding-btn { margin-bottom: 4px; }
+</style>
+
+
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+
+<div id="header">
+
+<div class="btn-group pull-right float-right">
+<button type="button" class="btn btn-default btn-xs btn-secondary btn-sm dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span>Code</span> <span class="caret"></span></button>
+<ul class="dropdown-menu dropdown-menu-right" style="min-width: 50px;">
+<li><a id="rmd-show-all-code" href="#">Show All Code</a></li>
+<li><a id="rmd-hide-all-code" href="#">Hide All Code</a></li>
+</ul>
+</div>
+
+
+
+<h1 class="title toc-ignore">Data Check v0 and v1: Inventory</h1>
+<h4 class="author">Virgilio Gonzenbach</h4>
+<h4 class="date">2/16/2023</h4>
+
+</div>
+
+
+<pre class="r"><code>library(dplyr)
+library(stringr)
+library(purrr)
+library(here)</code></pre>
+<div id="inventory-of-mscamras-dwi-data" class="section level1">
+<h1>Inventory of MSCAMRAS dwi data</h1>
+<p>This notebook reviews the state of the raw data located <code>/home/vgonzenb/mscamras/data/v0</code>. The <code>v0</code> directory contains raw data that was organized into BIDS format without modifications to either the data or metadata.</p>
+<p>If canonical BIDS format had been followed the relative path for a T1-weighted image would look like <code>data/v0/sub-&lt;subject-id&gt;/ses-&lt;site-id&gt;/anat/sub-&lt;subject-id&gt;_ses-&lt;site-id&gt;_run-&lt;visit-id&gt;_T1w.nii.gz</code>. Since qsiprep merges T1s across sessions and runs (which we want to avoid since data should be independent across sites), the data was organized so that each subject, site, and visit combination would be its own (modified) subject id like so: <code>data/v0/sub-&lt;subject-id&gt;&lt;site-id&gt;&lt;visit-id&gt;/anat/sub-&lt;subject-id&gt;&lt;site-id&gt;&lt;visit-id&gt;_T1w.nii.gz</code>.</p>
+<p>Additionally, the keyword <code>acq</code> indicates whether a scan was collected with distortion correction (taking values <code>D</code>) or without it (<code>ND</code>). Data from Hopkins was collected with distortion correction turned on, while all other sites acquired data both with and without distortion correction. The copy of the data used in this project excludes the distortion corrected data for Penn, NIH and BWH. [TODO: double check]</p>
+<p>Below, we inventory the T1w and dwi data.</p>
+<div id="t1w" class="section level2">
+<h2>T1w</h2>
+<pre class="r"><code>t1_paths &lt;- Sys.glob(here::here(&quot;data/v0/sub-*/anat/*T1w.nii.gz&quot;)) # search bids
+t1_df &lt;- data.frame(t1_path = t1_paths)
+# Parse paths
+t1_df &lt;- t1_df %&gt;% 
+  mutate(subject = str_extract(t1_path, &quot;(?&lt;=sub-)\\d{5}&quot;),
+         site = str_extract(t1_path, &quot;(?&lt;=sub-\\d{5})\\D+&quot;),
+         visit = str_extract(t1_path, &quot;\\d+(?=_acq)&quot;), 
+         .before = t1_path)</code></pre>
+<p>If a subject completed all their appointments,they should have had 2 visits at each of the 4 sites. Therefore, every subject should (ideally) have 8 T1-weighted images. The number of T1s for each subject is given in the following table:</p>
+<pre class="r"><code># Count images per subject
+(n_images &lt;- t1_df %&gt;% 
+  count(subject))</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["subject"],"name":[1],"type":["chr"],"align":["left"]},{"label":["n"],"name":[2],"type":["int"],"align":["right"]}],"data":[{"1":"01001","2":"8"},{"1":"01002","2":"8"},{"1":"01003","2":"8"},{"1":"02001","2":"8"},{"1":"02002","2":"8"},{"1":"02003","2":"8"},{"1":"03001","2":"4"},{"1":"03002","2":"6"},{"1":"04001","2":"8"},{"1":"04002","2":"8"},{"1":"04003","2":"8"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<pre class="r"><code># Get subjects with less than 8 images
+subjects_with_lt_8_imgs &lt;- n_images |&gt; 
+  filter(n &lt; 8) |&gt; 
+  pull(subject)</code></pre>
+<p>Subjects 03001 and 03002 have less than 8 images. We take a look at these subjects in more detail.</p>
+<pre class="r"><code># Get list of dataframe for each individual subject missing  at least one image
+missing_imgs_per_subject &lt;- t1_df %&gt;% 
+  filter(subject %in% subjects_with_lt_8_imgs) %&gt;% 
+  split(.$subject) %&gt;% 
+  setNames(subjects_with_lt_8_imgs)</code></pre>
+<p>Subject 03001 appears to be missing scans from NIH and Penn. [TODO: check in source data] [TODO: if really missing; document with Abby or Luyun the reason]</p>
+<pre class="r"><code>missing_imgs_per_subject[[&#39;03001&#39;]]</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":[""],"name":["_rn_"],"type":[""],"align":["left"]},{"label":["subject"],"name":[1],"type":["chr"],"align":["left"]},{"label":["site"],"name":[2],"type":["chr"],"align":["left"]},{"label":["visit"],"name":[3],"type":["chr"],"align":["left"]},{"label":["t1_path"],"name":[4],"type":["chr"],"align":["left"]}],"data":[{"1":"03001","2":"BWH","3":"01","4":"/home/vgonzenb/mscamras/data/v0/sub-03001BWH01/anat/sub-03001BWH01_acq-ND_T1w.nii.gz","_rn_":"1"},{"1":"03001","2":"BWH","3":"02","4":"/home/vgonzenb/mscamras/data/v0/sub-03001BWH02/anat/sub-03001BWH02_acq-ND_T1w.nii.gz","_rn_":"2"},{"1":"03001","2":"Penn","3":"01","4":"/home/vgonzenb/mscamras/data/v0/sub-03001Penn01/anat/sub-03001Penn01_acq-ND_T1w.nii.gz","_rn_":"3"},{"1":"03001","2":"Penn","3":"02","4":"/home/vgonzenb/mscamras/data/v0/sub-03001Penn02/anat/sub-03001Penn02_acq-ND_T1w.nii.gz","_rn_":"4"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<p>Subject 03002 appears to be missing scans from Penn. [TODO: check in source data] [TODO: if really missing document with Abby or Luyun the reason]</p>
+<pre class="r"><code>missing_imgs_per_subject[[&#39;03002&#39;]]</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":[""],"name":["_rn_"],"type":[""],"align":["left"]},{"label":["subject"],"name":[1],"type":["chr"],"align":["left"]},{"label":["site"],"name":[2],"type":["chr"],"align":["left"]},{"label":["visit"],"name":[3],"type":["chr"],"align":["left"]},{"label":["t1_path"],"name":[4],"type":["chr"],"align":["left"]}],"data":[{"1":"03002","2":"BWH","3":"01","4":"/home/vgonzenb/mscamras/data/v0/sub-03002BWH01/anat/sub-03002BWH01_acq-ND_T1w.nii.gz","_rn_":"5"},{"1":"03002","2":"BWH","3":"02","4":"/home/vgonzenb/mscamras/data/v0/sub-03002BWH02/anat/sub-03002BWH02_acq-ND_T1w.nii.gz","_rn_":"6"},{"1":"03002","2":"Hopkins","3":"01","4":"/home/vgonzenb/mscamras/data/v0/sub-03002Hopkins01/anat/sub-03002Hopkins01_acq-D_T1w.nii.gz","_rn_":"7"},{"1":"03002","2":"Hopkins","3":"02","4":"/home/vgonzenb/mscamras/data/v0/sub-03002Hopkins02/anat/sub-03002Hopkins02_acq-D_T1w.nii.gz","_rn_":"8"},{"1":"03002","2":"NIH","3":"01","4":"/home/vgonzenb/mscamras/data/v0/sub-03002NIH01/anat/sub-03002NIH01_acq-ND_T1w.nii.gz","_rn_":"9"},{"1":"03002","2":"NIH","3":"02","4":"/home/vgonzenb/mscamras/data/v0/sub-03002NIH02/anat/sub-03002NIH02_acq-ND_T1w.nii.gz","_rn_":"10"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+</div>
+<div id="dwi" class="section level2">
+<h2>DWI</h2>
+<p>During DWI acquisition, 2 opposite phase-encoding directions were collected to correct using FSL TOPUP. Therefore, it is expected that each subject should have 16 images (if all visits were completed).</p>
+<p>The phase-encoding direction for an image. This is also (which we examine below)</p>
+<pre class="r"><code># get dwi paths into data.frame
+dwi_paths &lt;- Sys.glob(here::here(&quot;data/v0/sub-*/dwi/*.nii.gz&quot;))
+dwi_df &lt;- data.frame(dwi_path = dwi_paths) #
+
+# parse subject, site and visit each paths
+dwi_df &lt;- dwi_df %&gt;% 
+  mutate(subject = str_extract(dwi_path, &quot;(?&lt;=sub-)\\d{5}&quot;),
+         site = str_extract(dwi_path, &quot;(?&lt;=sub-\\d{5})\\D+&quot;),
+         visit = str_extract(dwi_path, &quot;\\d+(?=_acq)&quot;), 
+         .before = dwi_path)</code></pre>
+<pre class="r"><code># Count images per subject
+(n_images &lt;- dwi_df %&gt;% 
+  count(subject))</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["subject"],"name":[1],"type":["chr"],"align":["left"]},{"label":["n"],"name":[2],"type":["int"],"align":["right"]}],"data":[{"1":"01001","2":"16"},{"1":"01002","2":"16"},{"1":"01003","2":"16"},{"1":"02001","2":"12"},{"1":"02002","2":"16"},{"1":"02003","2":"16"},{"1":"03001","2":"8"},{"1":"03002","2":"12"},{"1":"04001","2":"16"},{"1":"04002","2":"16"},{"1":"04003","2":"16"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<pre class="r"><code># Get subjects with less than 8 images
+subjects_missing_imgs &lt;- n_images |&gt; 
+  filter(n &lt; 16) |&gt; 
+  pull(subject)</code></pre>
+<p>Subjects 02001, 03001, and 03002 have less than 16 images. We take a look at these subjects in more detail.</p>
+<pre class="r"><code># Get list of dataframe for each individual subject missing  at least one image
+subjects_missing_imgs_df &lt;- dwi_df %&gt;%
+  filter(subject %in% subjects_missing_imgs) 
+
+missing_imgs_per_subject &lt;- subjects_missing_imgs_df |&gt; 
+split(subjects_missing_imgs_df$subject) |&gt;
+  setNames(subjects_missing_imgs)</code></pre>
+<p>Subject 02001 appears to be missing images from NIH. [TODO: check why]</p>
+<pre class="r"><code>missing_imgs_per_subject[[&#39;02001&#39;]]</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":[""],"name":["_rn_"],"type":[""],"align":["left"]},{"label":["subject"],"name":[1],"type":["chr"],"align":["left"]},{"label":["site"],"name":[2],"type":["chr"],"align":["left"]},{"label":["visit"],"name":[3],"type":["chr"],"align":["left"]},{"label":["dwi_path"],"name":[4],"type":["chr"],"align":["left"]}],"data":[{"1":"02001","2":"BWH","3":"01","4":"/home/vgonzenb/mscamras/data/v0/sub-02001BWH01/dwi/sub-02001BWH01_acq-ND_dir-AX_dwi.nii.gz","_rn_":"1"},{"1":"02001","2":"BWH","3":"01","4":"/home/vgonzenb/mscamras/data/v0/sub-02001BWH01/dwi/sub-02001BWH01_acq-ND_dir-XPhase_dwi.nii.gz","_rn_":"2"},{"1":"02001","2":"BWH","3":"02","4":"/home/vgonzenb/mscamras/data/v0/sub-02001BWH02/dwi/sub-02001BWH02_acq-ND_dir-AX_dwi.nii.gz","_rn_":"3"},{"1":"02001","2":"BWH","3":"02","4":"/home/vgonzenb/mscamras/data/v0/sub-02001BWH02/dwi/sub-02001BWH02_acq-ND_dir-XPhase_dwi.nii.gz","_rn_":"4"},{"1":"02001","2":"Hopkins","3":"01","4":"/home/vgonzenb/mscamras/data/v0/sub-02001Hopkins01/dwi/sub-02001Hopkins01_acq-D_dir-AX_dwi.nii.gz","_rn_":"5"},{"1":"02001","2":"Hopkins","3":"01","4":"/home/vgonzenb/mscamras/data/v0/sub-02001Hopkins01/dwi/sub-02001Hopkins01_acq-D_dir-XPhase_dwi.nii.gz","_rn_":"6"},{"1":"02001","2":"Hopkins","3":"02","4":"/home/vgonzenb/mscamras/data/v0/sub-02001Hopkins02/dwi/sub-02001Hopkins02_acq-D_dir-AX_dwi.nii.gz","_rn_":"7"},{"1":"02001","2":"Hopkins","3":"02","4":"/home/vgonzenb/mscamras/data/v0/sub-02001Hopkins02/dwi/sub-02001Hopkins02_acq-D_dir-XPhase_dwi.nii.gz","_rn_":"8"},{"1":"02001","2":"Penn","3":"01","4":"/home/vgonzenb/mscamras/data/v0/sub-02001Penn01/dwi/sub-02001Penn01_acq-ND_dir-AX_dwi.nii.gz","_rn_":"9"},{"1":"02001","2":"Penn","3":"01","4":"/home/vgonzenb/mscamras/data/v0/sub-02001Penn01/dwi/sub-02001Penn01_acq-ND_dir-XPhase_dwi.nii.gz","_rn_":"10"},{"1":"02001","2":"Penn","3":"02","4":"/home/vgonzenb/mscamras/data/v0/sub-02001Penn02/dwi/sub-02001Penn02_acq-ND_dir-AX_dwi.nii.gz","_rn_":"11"},{"1":"02001","2":"Penn","3":"02","4":"/home/vgonzenb/mscamras/data/v0/sub-02001Penn02/dwi/sub-02001Penn02_acq-ND_dir-XPhase_dwi.nii.gz","_rn_":"12"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<p>Subject 03001 appears to be missing images from NIH and BWH. [TODO: check why]</p>
+<pre class="r"><code>missing_imgs_per_subject[[&#39;03001&#39;]]</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":[""],"name":["_rn_"],"type":[""],"align":["left"]},{"label":["subject"],"name":[1],"type":["chr"],"align":["left"]},{"label":["site"],"name":[2],"type":["chr"],"align":["left"]},{"label":["visit"],"name":[3],"type":["chr"],"align":["left"]},{"label":["dwi_path"],"name":[4],"type":["chr"],"align":["left"]}],"data":[{"1":"03001","2":"BWH","3":"01","4":"/home/vgonzenb/mscamras/data/v0/sub-03001BWH01/dwi/sub-03001BWH01_acq-ND_dir-AX_dwi.nii.gz","_rn_":"13"},{"1":"03001","2":"BWH","3":"01","4":"/home/vgonzenb/mscamras/data/v0/sub-03001BWH01/dwi/sub-03001BWH01_acq-ND_dir-XPhase_dwi.nii.gz","_rn_":"14"},{"1":"03001","2":"BWH","3":"02","4":"/home/vgonzenb/mscamras/data/v0/sub-03001BWH02/dwi/sub-03001BWH02_acq-ND_dir-AX_dwi.nii.gz","_rn_":"15"},{"1":"03001","2":"BWH","3":"02","4":"/home/vgonzenb/mscamras/data/v0/sub-03001BWH02/dwi/sub-03001BWH02_acq-ND_dir-XPhase_dwi.nii.gz","_rn_":"16"},{"1":"03001","2":"Penn","3":"01","4":"/home/vgonzenb/mscamras/data/v0/sub-03001Penn01/dwi/sub-03001Penn01_acq-ND_dir-AX_dwi.nii.gz","_rn_":"17"},{"1":"03001","2":"Penn","3":"01","4":"/home/vgonzenb/mscamras/data/v0/sub-03001Penn01/dwi/sub-03001Penn01_acq-ND_dir-XPhase_dwi.nii.gz","_rn_":"18"},{"1":"03001","2":"Penn","3":"02","4":"/home/vgonzenb/mscamras/data/v0/sub-03001Penn02/dwi/sub-03001Penn02_acq-ND_dir-AX_dwi.nii.gz","_rn_":"19"},{"1":"03001","2":"Penn","3":"02","4":"/home/vgonzenb/mscamras/data/v0/sub-03001Penn02/dwi/sub-03001Penn02_acq-ND_dir-XPhase_dwi.nii.gz","_rn_":"20"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<p>Subject 03002 appears to be missing images from Penn [TODO: check why]</p>
+<pre class="r"><code>missing_imgs_per_subject[[&#39;03002&#39;]]</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":[""],"name":["_rn_"],"type":[""],"align":["left"]},{"label":["subject"],"name":[1],"type":["chr"],"align":["left"]},{"label":["site"],"name":[2],"type":["chr"],"align":["left"]},{"label":["visit"],"name":[3],"type":["chr"],"align":["left"]},{"label":["dwi_path"],"name":[4],"type":["chr"],"align":["left"]}],"data":[{"1":"03002","2":"BWH","3":"01","4":"/home/vgonzenb/mscamras/data/v0/sub-03002BWH01/dwi/sub-03002BWH01_acq-ND_dir-AX_dwi.nii.gz","_rn_":"21"},{"1":"03002","2":"BWH","3":"01","4":"/home/vgonzenb/mscamras/data/v0/sub-03002BWH01/dwi/sub-03002BWH01_acq-ND_dir-XPhase_dwi.nii.gz","_rn_":"22"},{"1":"03002","2":"BWH","3":"02","4":"/home/vgonzenb/mscamras/data/v0/sub-03002BWH02/dwi/sub-03002BWH02_acq-ND_dir-AX_dwi.nii.gz","_rn_":"23"},{"1":"03002","2":"BWH","3":"02","4":"/home/vgonzenb/mscamras/data/v0/sub-03002BWH02/dwi/sub-03002BWH02_acq-ND_dir-XPhase_dwi.nii.gz","_rn_":"24"},{"1":"03002","2":"Hopkins","3":"01","4":"/home/vgonzenb/mscamras/data/v0/sub-03002Hopkins01/dwi/sub-03002Hopkins01_acq-D_dir-AX_dwi.nii.gz","_rn_":"25"},{"1":"03002","2":"Hopkins","3":"01","4":"/home/vgonzenb/mscamras/data/v0/sub-03002Hopkins01/dwi/sub-03002Hopkins01_acq-D_dir-XPhase_dwi.nii.gz","_rn_":"26"},{"1":"03002","2":"Hopkins","3":"02","4":"/home/vgonzenb/mscamras/data/v0/sub-03002Hopkins02/dwi/sub-03002Hopkins02_acq-D_dir-AX_dwi.nii.gz","_rn_":"27"},{"1":"03002","2":"Hopkins","3":"02","4":"/home/vgonzenb/mscamras/data/v0/sub-03002Hopkins02/dwi/sub-03002Hopkins02_acq-D_dir-XPhase_dwi.nii.gz","_rn_":"28"},{"1":"03002","2":"NIH","3":"01","4":"/home/vgonzenb/mscamras/data/v0/sub-03002NIH01/dwi/sub-03002NIH01_acq-ND_dir-AX_dwi.nii.gz","_rn_":"29"},{"1":"03002","2":"NIH","3":"01","4":"/home/vgonzenb/mscamras/data/v0/sub-03002NIH01/dwi/sub-03002NIH01_acq-ND_dir-XPhase_dwi.nii.gz","_rn_":"30"},{"1":"03002","2":"NIH","3":"02","4":"/home/vgonzenb/mscamras/data/v0/sub-03002NIH02/dwi/sub-03002NIH02_acq-ND_dir-AX_dwi.nii.gz","_rn_":"31"},{"1":"03002","2":"NIH","3":"02","4":"/home/vgonzenb/mscamras/data/v0/sub-03002NIH02/dwi/sub-03002NIH02_acq-ND_dir-XPhase_dwi.nii.gz","_rn_":"32"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+</div>
+</div>
+<div id="conclusion" class="section level1">
+<h1>Conclusion</h1>
+<p>To exlucde <code>v1</code> of the data has</p>
+</div>
+
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open');
+  });
+});
+</script>
+
+<!-- code folding -->
+<script>
+$(document).ready(function () {
+  window.initializeCodeFolding("hide" === "show");
+});
+</script>
+
+<script>
+$(document).ready(function ()  {
+
+    // temporarily add toc-ignore selector to headers for the consistency with Pandoc
+    $('.unlisted.unnumbered').addClass('toc-ignore')
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
