@@ -14,10 +14,14 @@ output:
 knitr::opts_chunk$set(echo = FALSE)
 ```
 
+# QA Raw data
 ## Data
+
 ```{r, warning=FALSE, message=FALSE}
 library(dplyr)
 library(ggplot2)
+library(stringr)
+library(purrr)
 
 load.data = function(){
   df = read.table(here::here('results/dti_qa/dti_qa.tsv'))
@@ -53,6 +57,7 @@ load.data = function(){
 df = load.data()
 df 
 ```
+
 ### Images per site: 
 
 ```{r}
@@ -86,4 +91,7 @@ df %>% ggplot(aes(x=subj,y=maxABSrms, color=site)) + geom_jitter() + theme(axis.
 df %>% ggplot(aes(x=subj,y=outmax, color=site)) + geom_jitter() + theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 ```
+
+
+
 

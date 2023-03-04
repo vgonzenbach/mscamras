@@ -13,11 +13,90 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
 ```
 
-# Bval and Bvec checks
+## Outputs
 
-```{r}
+```{r, results='asis'}
+qsiprep_run_report = system("bash tmp/check_qsiprep_output.sh", intern=TRUE)
+for (line in qsiprep_run_report){
+  cat(line, "\n")
+}
+```
+
+
+## Error
+
+The following errors were thrown when running qsiprep by subject:
+
+```{r, echo=TRUE, eval=FALSE}
+sub-03002NIH02  Exception: Unable to merge using strategy 'average': exactly two distortion groups must be present in data. Found 1
+sub-02003NIH02  Exception: Unable to merge using strategy 'average': exactly two distortion groups must be present in data. Found 1
+sub-04003NIH02  Exception: Unable to merge using strategy 'average': exactly two distortion groups must be present in data. Found 1
+sub-01002NIH01  Exception: Unable to merge using strategy 'average': exactly two distortion groups must be present in data. Found 1
+sub-01001NIH01  Exception: Unable to merge using strategy 'average': exactly two distortion groups must be present in data. Found 1
+sub-01001Penn02 Exception: Bvecs do not match - ensure matching bvecs
+sub-04002Penn01 Exception: Bvecs do not match - ensure matching bvecs
+sub-04003BWH01  Exception: Bvecs do not match - ensure matching bvecs
+sub-04001NIH02  Exception: Unable to merge using strategy 'average': exactly two distortion groups must be present in data. Found 1
+sub-02003NIH01  Exception: Unable to merge using strategy 'average': exactly two distortion groups must be present in data. Found 1
+sub-02001Penn02 Exception: Bvecs do not match - ensure matching bvecs
+sub-02002BWH02  Exception: Bvecs do not match - ensure matching bvecs
+sub-04003BWH02  Exception: Bvecs do not match - ensure matching bvecs
+sub-04001BWH01  Exception: Bvecs do not match - ensure matching bvecs
+sub-01003Penn02 Exception: Bvecs do not match - ensure matching bvecs
+sub-01002BWH01  Exception: Bvecs do not match - ensure matching bvecs
+sub-04002Penn02 Exception: Bvecs do not match - ensure matching bvecs
+sub-01003BWH01  Exception: Bvecs do not match - ensure matching bvecs
+sub-02001Penn01 Exception: Bvecs do not match - ensure matching bvecs
+sub-01002Penn02 Exception: Bvecs do not match - ensure matching bvecs
+sub-01002BWH02  Exception: Bvecs do not match - ensure matching bvecs
+sub-03002BWH01  Exception: Bvecs do not match - ensure matching bvecs
+sub-02003Penn01 Exception: Bvecs do not match - ensure matching bvecs
+sub-04001Penn02 Exception: Bvecs do not match - ensure matching bvecs
+sub-03001BWH02  Exception: Bvecs do not match - ensure matching bvecs
+sub-04003Penn02 Exception: Bvecs do not match - ensure matching bvecs
+sub-02001BWH02  Exception: Bvecs do not match - ensure matching bvecs
+sub-03002BWH02  Exception: Bvecs do not match - ensure matching bvecs
+sub-02003BWH01  Exception: Bvecs do not match - ensure matching bvecs
+sub-01003NIH02  Exception: Bvecs do not match - ensure matching bvecs
+sub-04003NIH01  Exception: Bvecs do not match - ensure matching bvecs
+sub-03001BWH01  Exception: Bvecs do not match - ensure matching bvecs
+sub-04001BWH02  Exception: Bvecs do not match - ensure matching bvecs
+sub-01001BWH02  Exception: Bvecs do not match - ensure matching bvecs
+sub-04002BWH02  Exception: Bvecs do not match - ensure matching bvecs
+sub-01002NIH02  Exception: Unable to merge using strategy 'average': exactly two distortion groups must be present in data. Found 1
+sub-01003BWH02  Exception: Bvecs do not match - ensure matching bvecs
+sub-01001Penn01 Exception: Bvecs do not match - ensure matching bvecs
+sub-02002NIH01  Exception: Unable to merge using strategy 'average': exactly two distortion groups must be present in data. Found 1
+sub-02003BWH02  Exception: Bvecs do not match - ensure matching bvecs
+sub-01001NIH02  Exception: Unable to merge using strategy 'average': exactly two distortion groups must be present in data. Found 1
+sub-04001Penn01 Exception: Bvecs do not match - ensure matching bvecs
+sub-02002NIH02  Exception: Bvecs do not match - ensure matching bvecs
+sub-03001Penn02 Exception: Bvecs do not match - ensure matching bvecs
+sub-01001BWH01  Exception: Bvecs do not match - ensure matching bvecs
+sub-03001Penn01 Exception: Bvecs do not match - ensure matching bvecs
+sub-02002BWH01  Exception: Bvecs do not match - ensure matching bvecs
+sub-04003Penn01 Exception: Bvecs do not match - ensure matching bvecs
+sub-02001BWH01  Exception: Bvecs do not match - ensure matching bvecs
+sub-04001NIH01  Exception: Unable to merge using strategy 'average': exactly two distortion groups must be present in data. Found 1
+sub-03002NIH01  Exception: Unable to merge using strategy 'average': exactly two distortion groups must be present in data. Found 1
+sub-04002NIH01  Exception: Unable to merge using strategy 'average': exactly two distortion groups must be present in data. Found 1
+sub-04002NIH02  Exception: Unable to merge using strategy 'average': exactly two distortion groups must be present in data. Found 1
+sub-02003Penn02 Exception: Bvecs do not match - ensure matching bvecs
+sub-01003Penn01 Exception: Bvecs do not match - ensure matching bvecs
+sub-04002BWH01  Exception: Bvecs do not match - ensure matching bvecs
+sub-02002Penn01 Exception: Bvecs do not match - ensure matching bvecs
+sub-01002Penn01 Exception: Bvecs do not match - ensure matching bvecs
+sub-02002Penn02 Exception: Bvecs do not match - ensure matching bvecs
+```
+
+Thus, we check the bvec (and bvals) for the subjects that are having an error: `Exception: Bvecs do not match - ensure matching bvecs`.
+
+## Bval and Bvec checks
+
+```{r, message=FALSE}
 library(dplyr)
 library(stringr)
 library(purrr)
