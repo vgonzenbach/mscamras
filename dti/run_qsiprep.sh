@@ -46,7 +46,7 @@ logs_dir=logs/qsiprep/${version_dir}
 mkdir -p $logs_dir
 
 for subject in $(.venv/bin/python3 -c "import sys; from bids import BIDSLayout; layout = BIDSLayout('data/${version_dir}'); subjects = layout.get_subjects(); sys.stdout.write(' '.join(subjects))"); do
-    bsub -J qsiprep_${version_dir} -o $logs_dir/sub-$subject.log -e $logs_dir/sub-$subject.log singularity run --cleanenv -B /project/mscamras -B /home/vgonzenb/mscamras -B /appl/freesurfer-7.1.1/license.txt:/opt/freesurfer/license.txt \
+    bsub -J qsiprep_${version_dir} -oo $logs_dir/sub-$subject.log -eo $logs_dir/sub-$subject.log singularity run --cleanenv -B /project/mscamras -B /home/vgonzenb/mscamras -B /appl/freesurfer-7.1.1/license.txt:/opt/freesurfer/license.txt \
         /project/singularity_images/qsiprep_0.16.0RC3.sif /home/vgonzenb/mscamras/data/${version_dir} /home/vgonzenb/mscamras/data/${version_dir}/derivatives participant \
         --participant-label $subject \
         --output-resolution 2.2 \
