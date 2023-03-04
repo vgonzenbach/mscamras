@@ -13,3 +13,5 @@ data/
 work/
 dti/qa/
 .venv/
+docs/*_files
+notebooks/*_files
