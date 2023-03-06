@@ -2,7 +2,12 @@
 title: "check_qsiprep_output"
 author: "Virgilio Gonzenbach"
 date: '`r Sys.Date()`'
-output: html_document
+output: 
+  html_document:
+    df_print: paged
+    toc: true
+    toc_float: true
+    theme: cosmo
 ---
 
 ```{r setup, include=FALSE}
@@ -19,7 +24,8 @@ library(stringr)
 
 ## Checking T1s
 
-Two T1s are missing qsiprep output.
+No T1s are missing qsiprep output.
+
 ```{r}
 raw_t1 <- system("find data/v4 -name *_T1w.nii.gz -not -path *derivatives*", intern=TRUE)
 raw_t1_df <- raw_t1 |> 
@@ -43,34 +49,31 @@ qsiprep_t1_df <- qsiprep_t1 |>
 anti_join(raw_t1_df, qsiprep_t1_df,  by = c("subject", "site", "visit"))    
 ```
 
-```{bash}
-# first one
-cat logs/qsiprep/v4/sub-01001BWH01.log 
-```
-
-```{bash}
-cat logs/qsiprep/v4/sub-02002Hopkins02.log
-```
-
 
 ## DWI
 
-There are 3 missing DWIs. In addition to the 2 runs that failed for the T1s, there is one more and we take a look.
+
+```{bash, eval=FALSE, include=FALSE}
+expr 80 - $(find data/v4/derivatives/qsiprep -path '**dwi.nii.gz' | wc -l)
+```
+
+There is 1 missing DWIs.
 
 ```{r}
 # get dwi paths into data.frame
-raw_dwi_paths <- Sys.glob(here::here("data/v4/sub-*/dwi/*dwi.nii.gz"))
-raw_dwi_df <- data.frame(dwi_path = raw_dwi_paths) #
+raw_dwi_paths <- system("find data/v4 -path '**dwi.nii.gz' -not -path '*derivatives*'", intern=TRUE)
+raw_dwi_df <- data.frame(dwi_path = raw_dwi_paths) 
 
 # parse subject, site and visit each paths
 raw_dwi_df <- raw_dwi_df %>% 
   mutate(subject = str_extract(dwi_path, "(?<=sub-)\\d{5}"),
          site = str_extract(dwi_path, "(?<=sub-\\d{5})\\D+"),
          visit = str_extract(dwi_path, "\\d+(?=_acq)"), 
-         .before = dwi_path)
+         .before = dwi_path) |> 
+  arrange(subject, site, visit)
 
 # get dwi paths into data.frame
-qsiprep_dwi_paths <- Sys.glob(here::here("data/v4/derivatives/qsiprep/sub-*/dwi/*dwi.nii.gz"))
+qsiprep_dwi_paths <- system("find data/v4/derivatives/qsiprep -path '**dwi.nii.gz'", intern=TRUE)
 qsiprep_dwi_df <- data.frame(dwi_path = qsiprep_dwi_paths) #
 
 # parse subject, site and visit each paths
@@ -85,6 +88,36 @@ raw_dwi_df |>
 ```
 
 ```{bash}
-cat logs/qsiprep/v4/sub-01003Hopkins02.log
+cat logs/qsiprep/v4/sub-02002Hopkins02.log
 ```
 
+The only data that shows affine discrepancy is that of `02002Hopkins02`
+
+```{r}
+# compare affines across all dataset
+get_affine <- function(path){
+  system(sprintf("fslorient -getsform %s", path), intern=TRUE) |> 
+    str_split(" ") |> 
+    unlist() |> 
+    as.numeric() |> 
+    na.omit()
+}
+
+get_n_vols <- function(path){
+  system(sprintf("fslinfo %s | grep -E ^dim4 | cut -d$'\t' -f3", path), intern=TRUE) |> as.numeric()
+}
+
+raw_dwi_df$n_vols <- sapply(raw_dwi_df$dwi_path, get_n_vols)
+raw_dwi_df$affine <- lapply(raw_dwi_df$dwi_path, get_affine)
+
+# get affine diff between directions
+raw_dwi_df$diff <- raw_dwi_df |> 
+  tidyr::unite(bids_dir, subject, site, visit, remove=FALSE) |> 
+  group_split(bids_dir) |> 
+  purrr::map(~ sum(abs(.x$affine[[1]] - .x$affine[[2]]))) |> 
+  purrr::reduce(c) |> 
+  rep(each=2)
+
+raw_dwi_df |> 
+  filter(diff != 0)
+```
