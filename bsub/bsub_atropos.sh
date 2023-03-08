@@ -2,17 +2,9 @@
 module load ANTs
 
 # Get T1s
-missing_outfiles=($(bash inv/check_files.sh 'Atropos' | sed '1d'))
-
-i=0 # for naming jobs
-rm -f logs/atropos.log # clear previous logs
 # Pair mprages with masks, flairs then bsub mimosa
-
-for t1 in $(find /project/mscamras/gadgetron/datasets-new/ -name *brain_n4.nii.gz | grep MPRAGE); do
-    # if file is missing run program
-    if [[ "${missing_outfiles[*]}" =~ "$(basename $t1 .nii.gz)" ]]; then
-        bsub -m "pennsive01 pennsive03 pennsive04 pennsive05 silver01 amber04" -J atropos_"$i" -o logs/atropos.log -e logs/atropos.log Rscript vols/atropos.R "$t1" $(dirname $t1)/..
-        ((++i))
-    fi
-
+mkdir -p logs/atropos data/v5/derivatives/atropos
+for t1 in $(find data/v5/derivatives/qsiprep -path '*T1w.nii.gz' -not -path '*MNI*'); do
+    sub=$(echo $t1 | cut -d/ -f5)
+    bsub -J atropos -oo logs/atropos/$sub.log -eo logs/atropos/$sub.log Rscript seg/atropos.R ${t1}
 done

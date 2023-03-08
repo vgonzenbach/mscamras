@@ -1,21 +1,23 @@
-library(fslr)
+library(stringr)
 library(neurobase)
 library(ANTsR)
 library(extrantsr)
-library(scales)
-library(parallel)
+library(argparser)
 
 #ATROPOS for GM, WM, and CSF
+p <- arg_parser("Run Atropos segmentation")
+p <- add_argument(p, "T1w", help = 'T1-weighted image to run segmentation.')
+argv <- parse_args(p)
 
-argv = commandArgs(trailingOnly = TRUE)
-t1 = argv[1]
-out_dir = argv[2]
-out_dir = file.path(out_dir, "Atropos")
-dir.create(out_dir)
+# set up
+out_file = stringr::str_replace(argv$T1w, 'qsiprep', 'atropos') |>
+    stringr::str_replace('desc-preproc_T1w', 'space-orig_dseg')
+dir.create(dirname(out_file), recursive = TRUE)
 
-img = neurobase::readnii(t1)
+# compute result
+img = neurobase::readnii(argv$T1w)
 otropos_img = extrantsr::otropos(img, make_mask = TRUE)
 seg = otropos_img$segmentation
-out_file = file.path(outdir, sprintf("%s_atropos_seg.nii.gz", neurobase::nii.stub(t1, bn = TRUE)))
+# write result
 neurobase::writenii(seg, out_file)
 message(sprintf("Atropos segmentation saved as %s", out_file))
