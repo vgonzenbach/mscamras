@@ -160,4 +160,4 @@ missing_imgs_per_subject[['03002']]
 
 # Conclusion
 
-To exlucde `v1` of the data has 
+Subjects (i.e. subject-site-visit combination) with missing DTIs are excluded from v1 and subsequent data versions.

@@ -113,4 +113,16 @@ if [[ ${version_number} -ge 4 ]]; then
     .venv/bin/python3 inv/fix_json.py --fix-nih ${data_path}
 fi
 
+# Modify Hopkins subject
+if [[ ${version_number} -ge 5 ]]; then
+	.venv/bin/python3 <<-EOF
+		import nibabel as nb
+		first_img = nb.load("data/v5/sub-02002Hopkins02/dwi/sub-02002Hopkins02_acq-D_dir-XPhase_dwi.nii.gz")
+		second_img = nb.load("data/v5/sub-02002Hopkins02/dwi/sub-02002Hopkins02_acq-D_dir-AX_dwi.nii.gz")
+		fixed_second_img = nb.Nifti1Image(second_img.get_fdata(), first_img.affine, header=first_img.header)
+		fixed_second_img.to_filename("data/v5/sub-02002Hopkins02/dwi/sub-02002Hopkins02_acq-D_dir-AX_dwi.nii.gz")
+	EOF
+    # make bvecs match for this image
+    cp data/v5/sub-02002Hopkins02/dwi/sub-02002Hopkins02_acq-D_dir-AX_dwi.bvec data/v5/sub-02002Hopkins02/dwi/sub-02002Hopkins02_acq-D_dir-XPhase_dwi.bvec
+fi
 echo "Database ${data_version} copied"
