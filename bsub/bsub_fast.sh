@@ -1,18 +1,10 @@
 #!/bin/bash
-module load ANTs
+module load fsl
 
-# Get T1s
-missing_outfiles=($(bash inv/check_files.sh 'FAST' | sed '1d'))
+mkdir -p logs/fast data/v5/derivatives/fast
 
-i=0 # for naming jobs
-rm -f logs/fast.log # clear previous logs
-# Pair mprages with masks, flairs then bsub mimosa
-
-for t1 in $(find /project/mscamras/gadgetron/datasets-new/ -name *brain_n4.nii.gz | grep MPRAGE); do
+for t1 in $(find data/v5/derivatives/qsiprep -path '*T1w.nii.gz' -not -path '*MNI*'); do
     # if file is missing run program
-    if [[ "${missing_outfiles[*]}" =~ "$(basename $t1 .nii.gz)" ]]; then
-        bsub -m "pennsive01 pennsive03 pennsive04 pennsive05 silver01 amber04" -J fast_"$i" -o logs/fast.log -e logs/fast.log Rscript vols/fast.R "$t1" $(dirname $t1)/..
-        ((++i))
-    fi
-
+    sub=$(echo $t1 | cut -d/ -f5)
+    bsub -J fast -oo logs/fast/$sub.log -eo logs/fast/$sub.log Rscript seg/fsl_fast.R $t1
 done
