@@ -15,3 +15,4 @@ dti/qa/
 .venv/
 docs/*_files
 notebooks/*_files
+.vscode/
