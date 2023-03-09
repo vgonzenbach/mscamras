@@ -45,6 +45,9 @@ main = function() {
         in_atlas = "/project/MRI_Templates/OASIS-atlases/OASIS-TRT-20-%s/rai_t1weighted_brain.nii.gz"
         in_seg = "/project/MRI_Templates/OASIS-atlases/OASIS-TRT-20-%s/rai_thalamus_atlas_20-%s.nii.gz"
     }
+    # Set up
+    dir.create(dirname(argv$out), recursive=TRUE)
+
     # Set up inputs
     input.df = data.frame  (img=argv$img,
                             atlas=sapply(1:argv$num, function(j) sprintf(in_atlas, j)),

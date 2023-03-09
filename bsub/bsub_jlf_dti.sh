@@ -1,17 +1,18 @@
 #!/bin/bash
 # Submits jobs for jlf_seg of qsiprep-processed T1w images
 cd $(dirname $0)/..
-shopt -s extglob
-
-for img in $(ls data/derivatives/qsiprep/sub-*/anat/sub-+([0123456789])_desc-preproc_T1w.nii.gz ); do
+if [ $# -eq 0 ]; then
+    echo "choose mode 'WMGM' or 'thal'" && exit 1   
+fi
+mode=$1 # mode can be 'WMGM' or 'thal'
+mkdir -p logs/jlfseg_$mode data/v5/derivatives/jlfseg_$mode
+for t1 in $(find data/v5/derivatives/qsiprep -path '*T1w.nii.gz' -not -path '*MNI*'); do
     
-    outdir=$(dirname $img | sed 's/qsiprep/jlfseg/g')
-    mkdir -p $outdir
+    sub=$(echo $t1 | cut -d/ -f5)
+    out=$(echo ${t1%%.*} | sed "s/qsiprep/jlfseg_$mode/g ; s/T1w/space-T1w/g")_dseg.nii.gz
+    
+    bsub -J jlfseg_$mode -oo logs/jlfseg_$mode/$sub -eo logs/jlfseg_$mode/$sub Rscript seg/jlf.R --mode $mode -n 10 $t1 $out
 
-    outimg=${outdir}/$(basename $img .nii.gz | grep -Eo "sub-[0-9]+")_space-T1w_dseg.nii.gz
-
-    bsub Rscript seg/jlf.R $img $outimg
-    echo Running JLF on $img
 done
 
 echo '{
@@ -20,5 +21,4 @@ echo '{
     "PipelineDescription": {
         "Name": "JointLabelFusion Segmentation in Native Space (JLF_SEG)"
     }
-}' > data/derivatives/jlf_seg/dataset_description.json
-
+}' > data/v5/derivatives/jlfseg_$mode/dataset_description.json
