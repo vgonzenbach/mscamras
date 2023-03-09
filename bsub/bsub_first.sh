@@ -3,7 +3,7 @@ module load fsl
 
 mkdir -p logs/first data/v5/derivatives/first
 
-for t1 in $(find data/v5/derivatives/qsiprep -path '*T1w.nii.gz' -not -path '*MNI*'); do
+for t1 in $(find data/v5/derivatives/qsiprep -path '*masked_T1w.nii.gz' -not -path '*MNI*'); do
     # if file is missing run program
     sub=$(echo $t1 | cut -d/ -f5) # get subject
     out=$(echo ${t1%%.*} | sed 's/qsiprep/first/g')

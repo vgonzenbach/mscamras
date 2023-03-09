@@ -6,7 +6,7 @@ if [ $# -eq 0 ]; then
 fi
 mode=$1 # mode can be 'WMGM' or 'thal'
 mkdir -p logs/jlfseg_$mode data/v5/derivatives/jlfseg_$mode
-for t1 in $(find data/v5/derivatives/qsiprep -path '*T1w.nii.gz' -not -path '*MNI*'); do
+for t1 in $(find data/v5/derivatives/qsiprep -path '*masked_T1w.nii.gz' -not -path '*MNI*'); do
     
     sub=$(echo $t1 | cut -d/ -f5)
     out=$(echo ${t1%%.*} | sed "s/qsiprep/jlfseg_$mode/g ; s/T1w/space-T1w/g")_dseg.nii.gz
