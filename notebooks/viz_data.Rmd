@@ -1,0 +1,127 @@
+---
+title: "viz"
+author: "Virgilio Gonzenbach"
+date: "3/10/2023"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    
+---
+
+<style type="text/css">
+.main-container {
+  max-width: 1800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+```
+
+```{r, message=FALSE}
+library(dplyr)
+library(ggplot2)
+library(purrr)
+library(tibble)
+```
+
+
+```{r}
+seg_df = read.csv('avg_tensor_by_roi.csv', colClasses = c('roi' = 'character'))
+seg_df[,1] <- NULL
+jlf_dict = readxl::read_xlsx('/home/vgonzenb/MSKIDS/data/MUSE_ROI_Dict.xlsx') %>% 
+  filter(ROI_INDEX %in% 1:207)
+```
+
+
+```{r}
+#' Name ROIs according to Segmentation
+#'
+#' essentially, name_rois enables distinct recoding schemes of the 'roi' column according to the value in the 'segmentation' column.
+#' for usage, split or filter a data.frame by unique segmentations and indicate the segmentation type
+#' @param df a data.frame corresponding to data from one segmentation type only
+#' @param seg_type the segmentation type: 'atropos', 'fast', 'first', 'jlfseg_WMGM', or 'jlfseg_thal'
+#'@examples
+#'\dontrun{
+#' multiseg_df %>% split(seg_df$segmentation) %>% purrr::imap(name_rois) %>% dplyr::bind_rows()
+#'}
+#'@examples
+#'\dontrun{
+#' multiseg_df %>% filter(segmentation == seg_type) %>% name_rois(seg_type)
+#'}
+#' @return a data.frame with a recoded roi column
+name_rois <- function(df, seg_type){
+  roi_names_by_seg_type <- list(atropos = c(`1` = "CSF", `2` = "GM", `3` = "WM"),
+                                fast = c(`1` = "CSF", `2` = "GM", `3` = "WM"),
+                                first = c(`10` = "L.Thalamus", `49` = "R.Thalamus"),
+                                jlfseg_WMGM = jlf_dict$ROI_NAME |> setNames(jlf_dict$ROI_INDEX),
+                                jlfseg_thal = c(`1` = 'Thalamus'))
+  roi_names <- roi_names_by_seg_type[[seg_type]]
+  df %>% 
+    mutate(roi = recode(roi, !!!roi_names))
+}
+
+seg_df <- seg_df %>% 
+  split(seg_df$segmentation) %>% 
+  imap(name_rois) %>% 
+  bind_rows()
+```
+
+
+```{r}
+# name tissue types
+add_tissue_col <- function(df, seg_type){
+    tissues_by_seg_type <- list(atropos = setNames(nm = c("CSF", "GM", "WM")),
+                                fast = setNames(nm = c("CSF", "GM", "WM")),
+                                first = setNames(c("Thalamus", "Thalamus"), 
+                                                 c("L.Thalamus", "R.Thalamus")),
+                                jlfseg_WMGM = jlf_dict$TISSUE_SEG |> setNames(jlf_dict$ROI_NAME),
+                                jlfseg_thal = c('Thalamus' = 'Thalamus'))
+    tissue_type <- tissues_by_seg_type[[seg_type]]
+    df %>% 
+      mutate(tissue = recode(roi, !!!tissue_type), .after = "roi")
+}
+
+seg_df <- seg_df %>% 
+  split(seg_df$segmentation) %>% 
+  imap(add_tissue_col) %>% 
+  bind_rows()
+```
+
+```{r}
+# plot each segmentation
+plot_seg <- function(segmentation, tensormap){
+  seg_df |> 
+    filter(.data$segmentation == .env$segmentation, .data$tensormap == .env$tensormap) |> 
+    ggplot(aes(group=roi, x=roi, color=roi, y=values)) + 
+    geom_boxplot(outlier.shape = NA, alpha = 0.4) + 
+    geom_jitter() +
+    coord_flip() + 
+    ggtitle(paste(segmentation, tensormap, sep=' ')) +  
+    theme(legend.position="none")
+}
+
+params <- expand.grid(segmentation = unique(seg_df$segmentation),
+                         tensormap = unique(seg_df$tensormap))
+plot_list <- params %>% 
+  split(seq_len(nrow(.))) %>% 
+  purrr::map(~ plot_seg(.x$segmentation, .x$tensormap))
+names(plot_list) <- params %>%
+  tidyr::unite(combo, segmentation, tensormap, sep = ':') %>% 
+  pull()
+```
+
+## Plots
+
+```{r, results='asis'}
+for (plot_name in names(plot_list)){
+  cat("###", plot_name, "\n")
+  print(plot_list[[plot_name]])
+  cat('\n\n')
+}
+```
