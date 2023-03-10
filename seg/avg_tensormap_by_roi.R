@@ -1,0 +1,115 @@
+library(fslr)
+library(neurobase)
+library(stringr)
+library(purrr)
+library(dplyr)
+library(furrr)
+library(future.batchtools)
+
+#' get subject given a img filepath
+get_subject <- function(path) stringr::str_extract(path, 'sub-[0-9A-Za-z]+')
+
+#' get tensor map type from img filepath
+get_tensor_type <- function(path) stringr::str_extract(path, '(FA|MD|RD|AD).nii.gz') |> neurobase::nii.stub()
+
+#' map suffix to each segmentation directory
+get_seg_path <- function(dwi_path, seg_type){ # TODO: create the inverse function (rather add feature to make an inverse)
+    sub <- get_subject(dwi_path)
+    if (seg_type == 'atropos'){
+        suffix <- 'dseg.nii.gz'
+
+    } else if (seg_type == 'first'){
+        suffix <- '_all_none_firstseg.nii.gz'
+
+    } else if (seg_type == 'fast'){
+        suffix <- '_seg.nii.gz'
+
+    } else if (seg_type == 'jlfseg_WMGM'){
+        suffix <- 'dseg.nii.gz'
+
+    } else if (seg_type == 'jlfseg_thal'){
+        suffix <- 'dseg.nii.gz'
+
+    } else {
+        
+    }
+    cmd <- sprintf('find data/v5/derivatives/%s -name %s*%s', seg_type, sub, suffix)
+    system(cmd, intern=TRUE)
+}
+
+name_seg_cols <- function(df, seg_type){
+    
+    if (seg_type == 'atropos'){
+        col_names <- purrr::map_chr(c("CSF", "GM", "WM"), ~ sprintf('Atropos_', .x))
+
+    } else if (seg_type == 'first'){
+        col_names <- c('')
+
+    } else if (seg_type == 'fast'){
+        col_names <- c('')
+
+    } else if (seg_type == 'jlfseg_WMGM'){
+        #TODO
+    } else if (seg_type == 'jlfseg_thal'){
+        #TODO
+    } else {
+        #TODO
+    }
+    
+    return(colnames)
+}
+#' apply a function mean over image by roi
+#' 
+#' @param dwi_path TODO: name it img; take also images
+#' @param seg_type TODO: change to seg_path and 
+#' @param seg_name TODO: add this parameter (for row)
+#' @param img_name TODO: add this parameter
+#' @return a dataframe of avg TODO: generalize to other functions
+avg_tensormap_by_roi <- function(dwi_path, seg_type){
+
+    seg_path <- get_seg_path(dwi_path, seg_type) # TODO: take img path instead of seg_type
+
+    dwi_img <- neurobase::readnii(dwi_path) # TODO: also take img as arg
+    seg_img <- neurobase::readnii(seg_path) # TODO:
+
+    voxel_df <- data.frame(dwi_vox = as.vector(dwi_img), seg_vox = as.vector(seg_img)) |> 
+                filter(dwi_vox != 0)
+    values <- split(voxel_df$dwi_vox, voxel_df$seg_vox) |> 
+                    purrr::map_dbl(mean) # TODO: generalize to other statistics
+    data.frame(sub = get_subject(dwi_path), # TODO: get rid of this argument?
+               tensormap = get_tensor_type(dwi_path), # TODO: generalize this to img_name
+               segmentation = seg_type, # TODO: generalize this to segmentation name
+               roi = names(values), 
+               values = values) # TODO: name this according to function
+}
+
+# set up inputs
+dwi_paths <- dwi_path <- system(" find data/v5/derivatives/dtifit -name '*resampled*FA.nii.gz' -or -name '*resampled*MD.nii.gz' -or -name '*resampled*RD.nii.gz' -or -name '*resampled*AD.nii.gz' ", intern=TRUE)
+inputs_df <- expand.grid(dwi_path = dwi_paths, 
+                         seg_type = c('atropos', 'fast', 'first', 'jlfseg_WMGM', 'jlfseg_thal'),
+                         stringsAsFactors = FALSE)
+
+# test with reduced data
+system.time(df <- seq_len(nrow(inputs_df)) |>
+                    parallel::mclapply(function(i) avg_tensormap_by_roi(inputs_df[i,"dwi_path"], inputs_df[i,"seg_type"]), 
+                                        mc.cores = Sys.getenv('LSB_DJOB_NUMPROC')) |>
+                    dplyr::bind_rows()
+            )
+write.csv(df, 'avg_tensor_by_roi.csv')
+
+
+#message('Sequential run time:')
+#system.time(df <- purrr::map2(inputs$dwi_path, inputs$seg_type, ~ avg_tensormap_by_roi(.x, .y)))
+#system.time(df <- df |> bind_rows())
+#write.csv(df, 'extraction_sequential.csv')
+
+# Parallel test
+# create the future backend
+#plan(future.batchtools::batchtools_lsf, workers = availableCores())
+#
+#message('Parallel run time:')
+#system.time(df <- furrr::future_map2(inputs$dwi_path, inputs$seg_type, ~ avg_tensormap_by_roi(.x, .y)))
+#system.time(df <- df |> bind_rows())
+#write.csv(df, 'extraction_parallel.csv')
+
+#system.time(df <- df |> bind_rows())
