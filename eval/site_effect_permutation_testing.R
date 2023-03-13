@@ -49,16 +49,17 @@ get_ratio_stat = function(seg_df){
 
 permute_ratio_stat = function(seg_df, n.perms = 10000){
   perm_ratio_stats = list()
-  
-  for (n.perm in 1:n.perms){
-    perm_df = select(seg_df, subject, site, visit)
-    perm_ind = sample(1:nrow(perm_df), nrow(perm_df), replace = FALSE)
-    perm_df = cbind(perm_df, 
-                    select(seg_df[perm_ind, ], where(is.numeric)))
-    perm_ratio_stats = c(perm_ratio_stats, list(get_ratio_stat(perm_df)))
-  }
-  
-  return(perm_ratio_stats %>% bind_rows())
+    
+  seq_len(n.perms) %>% 
+    parallel::mclapply(mc.cores = future::availableCores(),
+                       function(i){
+                         perm_df = select(seg_df, subject, site, visit) # left side of df
+                         perm_ind = sample(1:nrow(perm_df), nrow(perm_df), replace = FALSE)
+                         perm_df = cbind(perm_df,
+                                         select(seg_df[perm_ind, ], where(is.numeric))) # add right side
+                         get_ratio_stat(perm_df)
+                         }) %>% 
+    bind_rows()
 }
 
 ratio.stat = get_ratio_stat(seg_df)
