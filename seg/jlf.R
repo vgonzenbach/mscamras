@@ -54,9 +54,10 @@ main = function() {
                             seg=sapply(1:argv$num, function(j) do.call("sprintf", c(list(in_seg), as.list(rep(j, stringr::str_count(in_seg, "%s"))))))
                             )
     # Run registrations
-    regs =  lapply(1:nrow(input.df), function(i) reg_atlas_and_seg (img = input.df[i, "img"], 
-                                                                    atlas = input.df[i, "atlas"], 
-                                                                    seg = input.df[i, "seg"]))
+    regs =  parallel::mclapply(1:nrow(input.df), function(i) reg_atlas_and_seg (img = input.df[i, "img"], 
+                                                                                atlas = input.df[i, "atlas"], 
+                                                                                seg = input.df[i, "seg"]),
+                                                                                mc.cores = future::availableCores())
     
     # Run JointLabel Fusion
     reg_atlases = paste(sapply(regs, function(x) x[1]), collapse=" ")
