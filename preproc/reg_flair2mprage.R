@@ -8,6 +8,7 @@ library(stringr)
 argv = commandArgs(trailingOnly = TRUE)
 flair = argv[1]
 mprage = argv[2]
+outpath = argv[3]
 
 
 print('Computing transformation...')
@@ -24,9 +25,5 @@ flair_reg = antsApplyTransforms(fixed=extrantsr::oro2ants(neurobase::readnii(mpr
                                 verbose = TRUE)
 
 print('Saving transformed image...')
-
-outdir = file.path(dirname(flair), "reg")
-dir.create(outdir)
-outpath = file.path(outdir, stringr::str_replace(basename(flair), '.nii.gz', '_reg.nii.gz'))
 antsImageWrite(flair_reg, outpath)
 print('Registration complete.')
