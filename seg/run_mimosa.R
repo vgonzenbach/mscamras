@@ -6,11 +6,11 @@ library(mimosa)
 # Read in arguments (paths)
 message("Reading in data...")
 argv = commandArgs(trailingOnly = TRUE)
-subj_dir = file.path(dirname(argv[1]), "..")
-out_dir = file.path(subj_dir, "mimosa", neurobase::nii.stub(basename(argv[1])))
+
 t1 = neurobase::readnii(argv[1])
 flair = neurobase::readnii(argv[2])
 brain_mask = neurobase::readnii(argv[3])
+outpath = argv[4]
 
 # Run WhiteStripe (intensity normalization)
 message('Running WhiteStripe normalization...')
@@ -37,20 +37,7 @@ predictions = predict(mimosa_model,
 probability_map = neurobase::niftiarr(cand_voxels, 0)
 probability_map[cand_voxels == 1] = predictions
 
-
-system(sprintf('mkdir %s/mimosa', subj_dir))
-system(sprintf('mkdir %s', out_dir))
-
 message('Smoothing probability map...')
 pmap_smooth = fslr::fslsmooth(probability_map, sigma = 1.25, mask=tissue_mask, retimg=TRUE, smooth_mask=TRUE) # probability map
-neurobase::writenii(pmap_smooth, file.path(out_dir, "prob_map.nii.gz"))
-
-thr = 0.2
-
-message('Binarizing mask...')
-lesion_binary_mask = (pmap_smooth >= thr) 
-
-out_path = file.path(out_dir, sprintf("bin_mask_%s.nii.gz", thr))
-neurobase::writenii(lesion_binary_mask, out_path)
-
-sprintf("Binary mask saved to %s", out_path)
+neurobase::writenii(pmap_smooth, outpath)
+message("Probability map saved.")

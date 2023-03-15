@@ -12,6 +12,6 @@ for tensor in FA MD RD AD; do
         out_resampled=$(echo $dwi | sed "s/$tensor.nii.gz/desc-resampled_$tensor.nii.gz/g")
         out_resampled_reg=$(echo $dwi | sed "s/$tensor.nii.gz/desc-resampledreg_$tensor.nii.gz/g")
         bsub -J resampling_${tensor}_${sub} -oo logs/resampling/${sub}_${tensor}.log -eo logs/resampling/${sub}_${tensor}.log c3d $dwi -resample 193x229x193 -o $out_resampled
-        bsub -J reg -w resampling_${tensor}_${sub} -ti -o logs/resampling/${sub}_${tensor}.log -e logs/resampling/${sub}_${tensor}.log Rscript preproc/reg_flair2mprage.R $out_resampled $t1 $out_resampled_reg
+        bsub -J reg_dwi -w resampling_${tensor}_${sub} -ti -o logs/resampling/${sub}_${tensor}.log -e logs/resampling/${sub}_${tensor}.log Rscript preproc/reg_flair2mprage.R $out_resampled $t1 $out_resampled_reg
     done
 done
