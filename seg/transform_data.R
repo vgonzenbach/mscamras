@@ -1,10 +1,11 @@
 library(dplyr)
 library(ggplot2)
 library(purrr)
+library(tidyr)
+library(stringr)
 
 # Name ROIs and pivot table
 seg_df = read.csv('avg_tensor_by_roi.csv', colClasses = c('roi' = 'character'))
-seg_df[,1] <- NULL
 jlf_dict = readxl::read_xlsx('/home/vgonzenb/MSKIDS/data/MUSE_ROI_Dict.xlsx') %>% 
   filter(ROI_INDEX %in% 1:207)
 
@@ -62,7 +63,7 @@ seg_df_wide <- seg_df %>%
   mutate(exclude = str_detect(tissue, "^[0-9]+$")) %>% 
   filter(exclude != TRUE) %>% 
   group_by(sub, tensormap, segmentation, tissue) %>% 
-  summarize(mean_values = sum(values), .groups = 'drop') %>% 
+  summarize(mean_values = mean(values), .groups = 'drop') %>% 
   filter(!tissue %in% c('NONE', 'CSF', 'VN')) %>% 
   unite(segmentation, segmentation, tissue, tensormap) %>% # for pivot wider
   pivot_wider(names_from = segmentation, values_from = mean_values) %>% 
@@ -84,5 +85,4 @@ seg_df_wide <- seg_df_wide %>%
 
 # write
 write.csv(seg_df_wide, 'avg_tensor_by_roi_wide.csv', row.names = FALSE)
-
-
+message("Transformed data saved as 'avg_tensor_by_roi_wide.csv'")

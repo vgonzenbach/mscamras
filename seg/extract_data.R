@@ -1,10 +1,9 @@
-library(fslr)
 library(neurobase)
 library(stringr)
 library(purrr)
 library(dplyr)
-library(furrr)
-library(future.batchtools)
+library(parallel)
+library(future)
 
 #' get subject given a img filepath
 get_subject <- function(path) stringr::str_extract(path, 'sub-[0-9A-Za-z]+')
@@ -84,7 +83,7 @@ avg_tensormap_by_roi <- function(dwi_path, seg_type){
 }
 
 # set up inputs
-dwi_paths <- dwi_path <- system(" find data/v5/derivatives/dtifit -name '*resampled*FA.nii.gz' -or -name '*resampled*MD.nii.gz' -or -name '*resampled*RD.nii.gz' -or -name '*resampled*AD.nii.gz' ", intern=TRUE)
+dwi_paths <- dwi_path <- system(" find data/v5/derivatives/dtifit -name '*resampledreg*FA.nii.gz' -or -name '*resampledreg*MD.nii.gz' -or -name '*resampledreg*RD.nii.gz' -or -name '*resampledreg*AD.nii.gz' ", intern=TRUE)
 inputs_df <- expand.grid(dwi_path = dwi_paths, 
                          seg_type = c('atropos', 'fast', 'first', 'jlfseg_WMGM', 'jlfseg_thal'),
                          stringsAsFactors = FALSE)
@@ -92,10 +91,10 @@ inputs_df <- expand.grid(dwi_path = dwi_paths,
 # test with reduced data
 system.time(df <- seq_len(nrow(inputs_df)) |>
                     parallel::mclapply(function(i) avg_tensormap_by_roi(inputs_df[i,"dwi_path"], inputs_df[i,"seg_type"]), 
-                                        mc.cores = Sys.getenv('LSB_DJOB_NUMPROC')) |>
+                                        mc.cores = future::availableCores()) |>
                     dplyr::bind_rows()
             )
-write.csv(df, 'avg_tensor_by_roi.csv')
+write.csv(df, 'avg_tensor_by_roi.csv', row.names = FALSE)
 
 
 #message('Sequential run time:')
