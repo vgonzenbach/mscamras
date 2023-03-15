@@ -1,29 +1,18 @@
 #!/bin/bash
 module load fsl
+cd $(dirname $0)/..
 
-# Get T1s
-missing_outfiles=($(bash inv/check_files.sh 'mimosa'))
-
-i=0 # for naming jobs
-rm -f logs/mimosa.log # clear previous logs
-# Pair mprages with masks, flairs then bsub mimosa
-for mprage in $(find /project/mscamras/gadgetron/datasets-new -name *brain_n4.nii.gz | grep MPRAGE); do 
+mkdir -p logs/mimosa
+for t1 in $(find data/v5/derivatives/qsiprep -name *desc-masked_T1w.nii.gz); do 
     
-    if [[ "${missing_outfiles[*]}" =~ "$(basename $mprage .nii.gz)" ]]; then
-    # run mimosa only is file is missing
-        if [[ "$mprage" =~ 'MPRAGE_SAG_TFL_ND_' ]]; then
-            flair=$(find $(dirname "$mprage") -name *FLAIR_SAG_VFL_ND_reg_brain_n4.nii.gz)
-        elif [[ "$mprage" =~ 'MPRAGE_SAG_TFL_NDa' ]]; then
-            flair=$(find $(dirname "$mprage") -name *FLAIR_SAG_VFL_NDa_reg_brain_n4.nii.gz)
-        fi
+    sub=$(echo $t1 | cut -d/ -f5)
+    flair=$(find data/v5/derivatives/mimosa -name $sub*desc-n4regmasked_T2w.nii.gz)
+    mask=$(find $(dirname $t1) -name *brain_mask.nii.gz -not -name *MNI*)
+    out_prob=$(echo $flair | sed 's/T2w.nii.gz/label-lesion_probseg.nii.gz/g') # mimosa probability map
 
-        dir=$(echo $(dirname $mprage) | sed 's/\/n4//g ; s/gadgetron\/datasets-new/Data/g')
-        brain_mask="$dir"/analysis/mass/$(basename $mprage .nii.gz | sed 's/_brain_n4//g ; s/^.*\(MPRAGE\)/\1/g')_n4_brainmask.nii.gz
-    
-        printf "Running mimosa:\nMPRAGE:%s\nFLAIR:%s\nMask:%s\n" "$mprage" "$flair" "$brain_mask"
-        bsub -m "pennsive01 pennsive03 pennsive04 pennsive05 silver01 amber04" -J mimosa_"$i" -o logs/mimosa.log -e logs/mimosa.log Rscript vols/run_mimosa.R "$mprage" "$flair" "$brain_mask"
-        ((i++))
-    fi
+    bsub -J mimosa_prob_$sub -oo logs/mimosa/$sub.log -eo logs/mimosa/$sub.log Rscript seg/run_mimosa.R $t1 $flair $mask $out_prob
+    out_bin=$(echo $out_prob | sed 's/probseg.nii.gz/mask.nii.gz/g') # mimosa lesion mask
+    bsub -J mimosa_bin_$sub -w mimosa_prob_$sub -ti -o logs/mimosa/$sub.log -e logs/mimosa/$sub.log fslmaths $out_prob -thr 0.2 $out_bin
 done
 
 

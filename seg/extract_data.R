@@ -29,34 +29,13 @@ get_seg_path <- function(dwi_path, seg_type){ # TODO: create the inverse functio
     } else if (seg_type == 'jlfseg_thal'){
         suffix <- 'dseg.nii.gz'
 
-    } else {
-        
+    } else if (seg_type == 'mimosa'){
+        suffix <- 'mask.nii.gz'
     }
     cmd <- sprintf('find data/v5/derivatives/%s -name %s*%s', seg_type, sub, suffix)
     system(cmd, intern=TRUE)
 }
 
-name_seg_cols <- function(df, seg_type){
-    
-    if (seg_type == 'atropos'){
-        col_names <- purrr::map_chr(c("CSF", "GM", "WM"), ~ sprintf('Atropos_', .x))
-
-    } else if (seg_type == 'first'){
-        col_names <- c('')
-
-    } else if (seg_type == 'fast'){
-        col_names <- c('')
-
-    } else if (seg_type == 'jlfseg_WMGM'){
-        #TODO
-    } else if (seg_type == 'jlfseg_thal'){
-        #TODO
-    } else {
-        #TODO
-    }
-    
-    return(colnames)
-}
 #' apply a function mean over image by roi
 #' 
 #' @param dwi_path TODO: name it img; take also images
@@ -83,9 +62,9 @@ avg_tensormap_by_roi <- function(dwi_path, seg_type){
 }
 
 # set up inputs
-dwi_paths <- dwi_path <- system(" find data/v5/derivatives/dtifit -name '*resampledreg*FA.nii.gz' -or -name '*resampledreg*MD.nii.gz' -or -name '*resampledreg*RD.nii.gz' -or -name '*resampledreg*AD.nii.gz' ", intern=TRUE)
+dwi_paths <- system(" find data/v5/derivatives/dtifit -name '*resampledreg*FA.nii.gz' -or -name '*resampledreg*MD.nii.gz' -or -name '*resampledreg*RD.nii.gz' -or -name '*resampledreg*AD.nii.gz' ", intern=TRUE)
 inputs_df <- expand.grid(dwi_path = dwi_paths, 
-                         seg_type = c('atropos', 'fast', 'first', 'jlfseg_WMGM', 'jlfseg_thal'),
+                         seg_type = c('atropos', 'fast', 'first', 'jlfseg_WMGM', 'jlfseg_thal', 'mimosa'),
                          stringsAsFactors = FALSE)
 
 # test with reduced data

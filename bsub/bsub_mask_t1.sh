@@ -1,5 +1,6 @@
 #!/bin/bash
 module load fsl
+cd $(dirname $0)/..
 
 # mask t1s from qsiprep
 mkdir -p logs/mask_t1 

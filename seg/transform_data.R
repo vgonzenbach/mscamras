@@ -29,7 +29,8 @@ name_rois <- function(df, seg_type){
                                 fast = c(`1` = "CSF", `2` = "GM", `3` = "WM"),
                                 first = c(`10` = "L.Thalamus", `49` = "R.Thalamus"),
                                 jlfseg_WMGM = jlf_dict$ROI_NAME |> setNames(jlf_dict$ROI_INDEX),
-                                jlfseg_thal = c(`1` = 'Thalamus'))
+                                jlfseg_thal = c(`1` = 'Thalamus'),
+                                mimosa = c(`1` = 'Lesion'))
   roi_names <- roi_names_by_seg_type[[seg_type]]
   df %>% 
     mutate(roi = recode(roi, !!!roi_names))
@@ -47,7 +48,8 @@ add_tissue_col <- function(df, seg_type){
                               first = setNames(c("Thalamus", "Thalamus"), 
                                                c("L.Thalamus", "R.Thalamus")),
                               jlfseg_WMGM = jlf_dict$TISSUE_SEG |> setNames(jlf_dict$ROI_NAME),
-                              jlfseg_thal = c('Thalamus' = 'Thalamus'))
+                              jlfseg_thal = c('Thalamus' = 'Thalamus'),
+                              mimosa = c('Lesion' = 'Lesion'))
   tissue_type <- tissues_by_seg_type[[seg_type]]
   df %>% 
     mutate(tissue = recode(roi, !!!tissue_type), .after = "roi")
