@@ -1,0 +1,197 @@
+---
+title: "Examining site effects in tensormap values"
+author: "Virgilio Gonzenbach"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    theme: united
+    toc: True
+    toc_float: True
+    df_print: paged
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE)
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+```
+
+```{r, warning=FALSE}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(kableExtra)
+
+options(scipen=999)
+df = read.csv('avg_tensor_by_roi_wide.csv',
+              colClasses = c('subject' = 'factor',
+                             'site' = 'factor',
+                             'visit' = 'factor'))
+tensor.names = df %>% select(where(is.numeric)) %>% colnames
+```
+
+## Data summary
+
+### Total visits per subjects
+
+```{r}
+df %>% count(subject, site, .drop = FALSE) 
+```
+
+### Scans at site per subject
+
+```{r}
+df %>% 
+  split(df$subject) %>%
+  sapply(function(df) table(df[, "site"])) %>% 
+  t() %>% 
+  as.data.frame()
+```
+
+## Fractional Anisotropy
+
+```{r, warning=FALSE}
+plot_avg_tensor_values <- function(tensor){
+  df %>% 
+    select(!is.numeric, ends_with(tensor)) %>% 
+    pivot_longer(ends_with(tensor), names_to = 'seg', values_to = 'average') %>% 
+    separate(seg, into = c('segmentation', 'roi', 'tensor')) %>% 
+    unite(segmentation, segmentation, roi, sep = " ") %>% 
+    ggplot(aes(x=site, y=average)) + 
+    geom_boxplot(outlier.shape = NA) + 
+    geom_jitter(aes(color = subject)) +
+    #facet_grid(site~.) + 
+    facet_grid(segmentation ~ .) +
+    coord_flip() +
+    ggtitle(sprintf("Mean %s in ROI by site", tensor)) +
+    theme_bw() + 
+    # theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust=1)) +
+    xlab("") + 
+    ylab("") + 
+    theme(strip.text.y = element_text(angle = 0))
+}
+
+plot_avg_tensor_values('FA')
+```
+
+## Mean Diffusivity
+
+```{r}
+plot_avg_tensor_values('MD')
+```
+
+## Radial Diffusivity
+
+```{r}
+plot_avg_tensor_values('RD')
+```
+
+## Axial Diffusivity
+
+```{r}
+plot_avg_tensor_values('AD')
+```
+
+## Site effects
+
+```{r, warning=FALSE}
+get.r.sq = function(df){
+
+ r.sq = numeric(0)
+ for (v in tensor.names) { # global tensor.names
+   # deal with NAs
+   res = tryCatch(summary(lm(df[,v ] ~ df$site))$r.squared, 
+                  error = function(cond) return(NA))
+   r.sq = c(r.sq, res)
+ }
+ names(r.sq) = tensor.names
+ return(r.sq)
+}
+
+# Get r-sq for gadgetron recons
+r_sq_df = df %>%
+  split(df$subject) %>% 
+  lapply(get.r.sq) %>% 
+  bind_rows(.id='subject')
+
+r_sq_df %>% 
+  pivot_longer(cols=tensor.names, names_to = "segmentation", values_to = "R.squared") %>% 
+  ggplot(aes(x=segmentation, y=R.squared)) + 
+  geom_boxplot() + 
+  coord_flip() + 
+  ggtitle("R squared values of site effects") + 
+  theme(plot.title = element_text(hjust = 0.5))
+# r_sq_df %>% 
+#   pivot_longer(cols=tensor.names, names_to = "segmentation", values_to = "R.squared") %>% 
+#   ggplot(aes(x=segmentation, y=R.squared, color = subject)) + 
+#   geom_boxplot(aes(x=segmentation, y=R.squared, color = NULL)) +
+#   geom_jitter() +
+#   coord_flip() +
+#   ggtitle("R squared values of site effects (Gadgetron)") + theme(plot.title = element_text(hjust = 0.5))
+```
+
+## Permutation Testing
+
+pseudo-F Ratio statistics: Intersite Variability / Intrasite Variability
+
+```{r}
+ratio_stats = readRDS("results/avg_tensor_by_roi_wide_ratio_stat.rds")
+null_dist = readRDS("results/avg_tensor_by_roi_wide_null.rds")
+ratio_stats
+```
+
+Distribution of permutated pseudo-F stats:
+
+```{r, warning=FALSE}
+null_dist %>% 
+  pivot_longer(everything()) %>% 
+  ggplot(aes(x=name, y=value)) + 
+  geom_violin(draw_quantiles = c(0.95)) + 
+  geom_point(aes(x=name, y=value), 
+             data = ratio_stats %>% 
+               pivot_longer(everything())) + 
+  coord_flip()
+```
+
+P-value of pseudo-F stat:
+
+```{r}
+test_ratio_stat = function(ratio.stats, null.dists){
+  
+  p.vals = c()
+  for (col in colnames(ratio.stats)){
+    ratio.stat = ratio.stats[, col]
+    null.dist = null.dists[, col]
+    
+    percentile = ecdf(null.dist)
+    p.vals = c(p.vals, percentile(ratio.stat))
+  }
+  names(p.vals) = colnames(ratio.stats)
+  return(p.vals)
+}
+
+p = 1 - test_ratio_stat(ratio_stats, null_dist)
+p_df <- data.frame(p.val = (10000*p + 1)/(1+10000)) 
+p_df %>% 
+  t() %>% 
+  as.data.frame()
+```
+
+FDR-corrected:
+
+```{r}
+p_df %>% 
+  mutate(p.val = p.adjust(p.val, method = 'fdr')) %>% 
+  t() %>% 
+  as.data.frame()
+```
+
+Bonferroni-corrected:
+
+```{r}
+p_df %>% 
+  mutate(p.val = p.adjust(p.val, method = 'bonferroni')) %>% 
+  t() %>% 
+  as.data.frame()
+```
+

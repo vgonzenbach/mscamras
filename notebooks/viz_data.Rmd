@@ -6,7 +6,8 @@ output:
   html_document:
     toc: true
     toc_float: true
-    
+    code_folding: hide
+    df_print: paged
 ---
 
 <style type="text/css">
@@ -19,7 +20,8 @@ output:
 
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = TRUE,
+                      warning=FALSE)
 knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
 ```
 
@@ -28,11 +30,34 @@ library(dplyr)
 library(ggplot2)
 library(purrr)
 library(tibble)
+library(tidyr)
+library(stringr)
 ```
 
+# Data visualization
+
+In this notebook, the average tensor values extracted across ROIs are plotted before filtering and aggregation of the data. All regions are included. 
+
+Abbreviations:  
+
+- White Matter (WM)  
+- Grey Matter (GM)  
+- Cerebrospinal Fluid (CSF)  
+- Ventricles (VN)  
+
+- Fractional Asinotropy (FA)
+- Mean Diffusivity (MD)
+- Axial Diffusivity (AD)
+- Radial Diffusivity (RD)
+
+Colors in the plots represent distinct subjects.
 
 ```{r}
-seg_df = read.csv('avg_tensor_by_roi.csv', colClasses = c('roi' = 'character'))
+seg_df = read.csv('avg_tensor_by_roi.csv', colClasses = c('roi' = 'character')) %>% 
+  mutate(subject = str_extract(sub, "(?<=sub-)\\d{5}"),
+         site = str_extract(sub, "(?<=sub-\\d{5})\\D+"),
+         visit = str_extract(sub, "[0-9]{2}$"), 
+         .after = sub)
 seg_df[,1] <- NULL
 jlf_dict = readxl::read_xlsx('/home/vgonzenb/MSKIDS/data/MUSE_ROI_Dict.xlsx') %>% 
   filter(ROI_INDEX %in% 1:207)
@@ -58,7 +83,21 @@ jlf_dict = readxl::read_xlsx('/home/vgonzenb/MSKIDS/data/MUSE_ROI_Dict.xlsx') %>
 name_rois <- function(df, seg_type){
   roi_names_by_seg_type <- list(atropos = c(`1` = "CSF", `2` = "GM", `3` = "WM"),
                                 fast = c(`1` = "CSF", `2` = "GM", `3` = "WM"),
-                                first = c(`10` = "L.Thalamus", `49` = "R.Thalamus"),
+                                first = c(`10` = "L. Thalamus",
+                                          `11` = "L. Caudate",
+                                          `12` = "L. Putamen",
+                                          `13` = "L. Pallidum",
+                                          `16` = "Brain-Stem/4th Ventricle",
+                                          `17` = "L. Hippocampus",
+                                          `18` = "L. Amygdala",
+                                          `26` = "L. Accumbens-area",
+                                          `49` = "R. Thalamus",
+                                          `50` = "R. Caudate",
+                                          `51` = "R. Putamen",
+                                          `52` = "R. Pallidum",
+                                          `53` = "R. Hippocampus",
+                                          `54` = "R. Amygdala",
+                                          `58` = "R. Accumbens-area"),
                                 jlfseg_WMGM = jlf_dict$ROI_NAME |> setNames(jlf_dict$ROI_INDEX),
                                 jlfseg_thal = c(`1` = 'Thalamus'))
   roi_names <- roi_names_by_seg_type[[seg_type]]
@@ -95,33 +134,94 @@ seg_df <- seg_df %>%
 
 ```{r}
 # plot each segmentation
-plot_seg <- function(segmentation, tensormap){
-  seg_df |> 
-    filter(.data$segmentation == .env$segmentation, .data$tensormap == .env$tensormap) |> 
-    ggplot(aes(group=roi, x=roi, color=roi, y=values)) + 
+plot_seg <- function(mini_df, title=NULL){
+  
+  title <- paste(title, names(mini_df))
+  
+  mini_df %>%  
+    ggplot(aes(group=roi, x=roi, color=subject, y=values)) + 
     geom_boxplot(outlier.shape = NA, alpha = 0.4) + 
     geom_jitter() +
-    coord_flip() + 
-    ggtitle(paste(segmentation, tensormap, sep=' ')) +  
+    coord_flip() +
     theme(legend.position="none")
 }
 
-params <- expand.grid(segmentation = unique(seg_df$segmentation),
-                         tensormap = unique(seg_df$tensormap))
-plot_list <- params %>% 
-  split(seq_len(nrow(.))) %>% 
-  purrr::map(~ plot_seg(.x$segmentation, .x$tensormap))
-names(plot_list) <- params %>%
-  tidyr::unite(combo, segmentation, tensormap, sep = ':') %>% 
-  pull()
-```
+plot_list <- seg_df %>% 
+  filter(segmentation != 'jlfseg_WMGM') %>% 
+  split(list(.$segmentation, .$tensormap)) %>% 
+  purrr::imap(plot_seg)
 
-## Plots
+```
 
 ```{r, results='asis'}
 for (plot_name in names(plot_list)){
-  cat("###", plot_name, "\n")
+  header <- plot_name %>% 
+    str_replace("\\.", " ") %>% 
+    str_replace("_", " ") %>% 
+    str_to_upper()
+  cat("###", header, "\n")
   print(plot_list[[plot_name]])
   cat('\n\n')
 }
 ```
+
+```{r}
+plot_list <- seg_df %>% 
+      filter(segmentation == 'jlfseg_WMGM', !roi %in% c('46', '63', '64', '69'), tissue != 'GM') %>%
+      split(list(.$tissue, .$tensormap)) %>%
+      purrr::imap(plot_seg)
+```
+
+```{r, results='asis'}
+for (plot_name in names(plot_list)){
+  header <- plot_name %>% 
+    str_replace("\\.", " ") %>% 
+    str_to_upper()
+  cat("###", "JLF", header, "\n")
+  print(plot_list[[plot_name]])
+  cat('\n\n')
+}
+```
+
+### JLF GM
+
+```{r}
+plot_list <- seg_df %>%
+  filter(segmentation == 'jlfseg_WMGM', !roi %in% c('46', '63', '64', '69'), tissue == 'GM') %>% 
+  split(list(rep(c(1,2,3,4,5,6), each = 20)[-120], .$tensormap)) %>% 
+  purrr::imap(plot_seg)
+```
+
+```{r, results='asis'}
+for (plot_name in names(plot_list)){
+  header <- plot_name %>% 
+    str_replace("[0-9]+\\.", "") %>% 
+    str_to_upper()
+  cat("###", "JLF GM", header, "\n")
+  print(plot_list[[plot_name]])
+  cat('\n\n')
+}
+```
+
+## Missing Info on Labels
+
+Excluding non brain (label 0), irrelevant segmentations for first. JLF shows three labels 46, 63, 64, 69 that are not in the current data dictionary. This might lead to missing information on
+
+```{r}
+seg_df %>% 
+  mutate(exclude = str_detect(tissue, "^[0-9]+$")) %>% 
+  filter(exclude == TRUE) %>% 
+  filter(tensormap == 'FA') %>% # to reduce the amount of data viewer
+  group_by(segmentation, tissue) %>% 
+  filter(row_number()==1, roi != 0) %>%
+  select(-tensormap, -tissue)
+
+```
+
+```{r}
+seg_df %>% 
+  mutate(exclude = str_detect(.$tissue, "^[0-9]+$")) %>% 
+  filter(exclude == TRUE) %>% 
+  filter(tissue %in% c('NONE', 'CSF', 'VN'))
+```
+
