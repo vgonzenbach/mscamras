@@ -1,5 +1,5 @@
 ---
-title: "Examining site effects in tensormap values"
+title: "Examining site effects in DTIMSCAMRAS"
 author: "Virgilio Gonzenbach"
 date: "`r Sys.Date()`"
 output: 
@@ -7,12 +7,12 @@ output:
     theme: united
     toc: True
     toc_float: True
-    df_print: paged
     code_folding: hide
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, message=FALSE)
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE, rows.print = 15)
 knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
 ```
 
@@ -20,35 +20,178 @@ knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
 library(dplyr)
 library(tidyr)
 library(ggplot2)
-library(kableExtra)
+library(stringr)
+library(lme4)
 
 options(scipen=999)
 df = read.csv('avg_tensor_by_roi_wide.csv',
               colClasses = c('subject' = 'factor',
                              'site' = 'factor',
-                             'visit' = 'factor'))
-tensor.names = df %>% select(where(is.numeric)) %>% colnames
+                             'visit' = 'factor')) %>% 
+  rename(scan = visit)
+outcomes = df %>% 
+  select(where(is.numeric)) %>% 
+  colnames
+
+# replace ATROPOS measures with NA for select images (segmentation failed)
+
+atropos_cols <- df %>% 
+  select(contains('ATROPOS')) %>% 
+  colnames()
+df[(df$subject == '04001' & df$site == 'NIH' & df$scan == '01') |
+   (df$subject == '01003' & df$site == 'NIH' & df$scan == '01') |
+   (df$subject == '03002' & df$site == 'NIH' & df$scan == '02') |
+   (df$subject == '04003' & df$site == 'NIH' & df$scan == '01') |
+   (df$subject == '04001' & df$site == 'BWH' & df$scan == '02') |
+   (df$subject == '03001' & df$site == 'BWH' & df$scan == '01'), atropos_cols] <- NA
 ```
 
-## Data summary
+## Summary 
 
-### Total visits per subjects
+The purpose of the DTIMSCAMRAS study is to test for site effects on DTI metrics of different brain regions in the context of a traveling subjects design with a harmonized imaging protocol. Participants (n=11) with stable Multiple Sclerosis (MS) were scanned in 4 different locations: National Institute of Health (NIH), Brigham and Women's Hospital (BWH), Johns Hopkins University (Hopkins), and The University of Pennsylvania (Penn). Two scans were collected per site visit, and participants were re-positioned between scans. The modalities that were collected include T1s (MPRAGE), FLAIR, and Diffusion-weighted images (DWI).  
+
+### Preprocessing
+
+To preprocess imaging data, [`qsiprep`](https://qsiprep.readthedocs.io/en/latest/) was used for bias correction, skull-stripping and co-registration of the T1s and DWIs, and specialized denoising and artifact correction for the DWIs. Then, DTIFIT was used to compute the following [scalar maps](https://www.diffusion-imaging.com/2013/01/relation-between-neural-microstructure.html):
+* Fractional Anisotropy
+* Mean Diffusivity
+* Axial Diffusivity
+* Radial Diffusivity
+
+Concurrently, several segmentation pipelines were used on the T1s (+ FLAIRs in the case of MIMOSA) with the purpose of defining particular regions of interest (ROIs):
+
+* White Matter and Gray Matter Segmentation methods:
+  + ANTs ATROPOS
+  + FSL FAST
+  + Multi-Atlas Segmentation with Joint Label Fusion using the MUSE templates (JLF WM and JLF GM)
+* Thalamus Segmentation
+  + FSL FIRST
+  + Multi-Atlas Segmentation with Joint Label Fusion using the OASIS templates (JLF THALAMUS)
+* Lesion Segmentation methods:
+  + MIMOSA
+  
+The segmentation results were used to average the scalar maps across all voxels belonging to each of the ROIs. The 36 resulting metrics make up the set of outcome variables which are the focus of the site effects test. Below, the outcome variables are listed. 
 
 ```{r}
-df %>% count(subject, site, .drop = FALSE) 
+data.frame(OUTCOME = outcomes) %>% 
+  separate(OUTCOME, c("SEGMENTATION", "ROI", "SCALAR"), remove = FALSE)
 ```
+
+Note the general <SEGMENTATION>_<ROI>_<SCALAR> format; for example, the ATROPOS_GM_AD variable denotes the average Axial Diffusivity (AD) across the Gray Matter (GM) regions defined by the Atropos Segmentation.
+
+### Testing site effects
+
+A permutation-based F-test was used to test for site effects in the absence of parametric assumptions. For each subject, the absolute difference between all possible pairs of intra-site and inter-site measures were computed. For instance, take the first row of the subject data.frame below, which has BWH as the "reference site": the absolute differences between that row and the 6 non-BWH rows are computed for $y$——this process is repeated for all rows (and the results averaged) to arrive to the average inter-site difference for this subject; for the average intra-site differences the absolute difference of the 4 intrasite pairs are averaged.
+
+```{r}
+df %>% 
+  filter(subject == '01001') %>% 
+  select(!where(is.numeric), ATROPOS_GM_AD) %>% 
+  rename(y = ATROPOS_GM_AD)
+```
+
+These differences were averaged across all subjects resulting in the Mean Absolute Difference Between Sites ($\overline{MAD_{B}}$) and the Mean Absolute Difference Within Sites ($\overline{MAD_{W}}$). The test statistic is composed of their ratio:
+
+$$
+F = \frac{\overline{MAD_{B}}}{\overline{MAD_{W}}}
+$$
+
+**Key Findings:** Permutation tests revealed significant site effects in that all 36 outcomes. 
+
+## Data Inventory
+
+
+Subjects 03001 and 03002 didn’t complete imaging at all 4 sites. Subject 03001 completed imaging at Penn and BWH only and 03002 completed imaging at BWH, Hopkins, and the NIH only.
+
+Subject 02001 is missing missing DTI data from their NIH visit and is therefore excluded from this analysis. 
 
 ### Scans at site per subject
 
 ```{r}
-df %>% 
-  split(df$subject) %>%
-  sapply(function(df) table(df[, "site"])) %>% 
-  t() %>% 
-  as.data.frame()
+t_df <- df %>% 
+   count(subject, site, .drop = FALSE) %>% 
+  tidyr::pivot_wider(names_from = site, values_from = n) %>% 
+  mutate(`Row Totals` = BWH + Hopkins + NIH + Penn) 
+t_df <- t_df %>% 
+  summarize(across(where(is.integer), sum)) %>% 
+  bind_rows(t_df, .) %>% 
+  mutate(across(where(is.factor), as.character))
+t_df[is.na(t_df)] <- "Column Totals"
+t_df
 ```
 
-## Fractional Anisotropy
+
+### For Atropos (substracting failed segmentations)
+
+Atropos segmentation failed for 6 images: `r knitr::combine_words(c('04001NIH01', '01003NIH01', '03002NIH02', '04003NIH01', '04001BWH02', '03001BWH01'))`.
+
+
+![atropos fail](misc/atropos_fail.png)
+
+```{r, fig.show='hold', fig.align='center', out.width="49%", out.height="20%"}
+#knitr::include_graphics(here::here(c('misc/atropos_fail.png', 'misc/atropos_success.png')))
+```
+```{r}
+#knitr::include_graphics("misc/atropos_fail.png")
+```
+
+
+```{r, fig.show='hold', fig.align='center', out.width="49%", out.height="20%"}
+#knitr::include_graphics("misc/atropos_success.png")
+```
+
+```{r}
+t_df <- df %>% 
+  unite(sub, subject, site, scan, sep = '-') %>%
+  filter(!sub %in% c('04001-NIH-01', '01003-NIH-01', '03002-NIH-02', '04003-NIH-01', '04001-BWH-02', '03001-BWH-01')) %>%
+  separate(sub, c('subject', 'site', 'scan')) %>%
+  mutate_if(is.character, as.factor) %>% 
+  count(subject, site, .drop = FALSE) %>% 
+  tidyr::pivot_wider(names_from = site, values_from = n) %>% 
+  mutate(`Row Totals` = BWH + Hopkins + NIH + Penn)
+
+t_df <- t_df %>% 
+  summarize(across(where(is.integer), sum)) %>% 
+  bind_rows(t_df, .) %>% 
+  mutate(across(where(is.factor), as.character))
+t_df[is.na(t_df)] <- "Column Totals"
+t_df
+```
+
+## Visualizations 
+
+### Fractional Anisotropy 
+
+#### Densities {.tabset}
+
+Densities are colored by site, while the black line represents the overall density aggregated across sites. 
+
+```{r}
+plot_densities <- function(var){
+  df %>% 
+    ggplot(aes_string(x=var, color='site')) + 
+    geom_density() + 
+    stat_density(aes_string(x = var), geom = "line", color = "black") +
+    theme_bw() + 
+    xlab(str_replace_all(var, "_", " "))
+}
+
+vars <-df %>% 
+  select(ends_with('FA')) %>% 
+  colnames()
+dplots <- lapply(vars, plot_densities) %>% 
+  setNames(vars)
+```
+
+```{r, results='asis'}
+for (name in names(dplots)){
+  cat("#####",  str_replace_all(name, "_", " "), "\n")
+  print(dplots[[name]])
+  cat("\n\n")
+}
+```
+
+#### Boxplots
 
 ```{r, warning=FALSE}
 plot_avg_tensor_values <- function(tensor){
@@ -59,13 +202,14 @@ plot_avg_tensor_values <- function(tensor){
     unite(segmentation, segmentation, roi, sep = " ") %>% 
     ggplot(aes(x=site, y=average)) + 
     geom_boxplot(outlier.shape = NA) + 
-    geom_jitter(aes(color = subject)) +
+    geom_jitter(aes(color = subject, shape=scan), alpha=0.6) +
     #facet_grid(site~.) + 
     facet_grid(segmentation ~ .) +
     coord_flip() +
     ggtitle(sprintf("Mean %s in ROI by site", tensor)) +
     theme_bw() + 
     # theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust=1)) +
+    scale_x_discrete(expand = c(.00000001, .00000001)) +
     xlab("") + 
     ylab("") + 
     theme(strip.text.y = element_text(angle = 0))
@@ -74,37 +218,98 @@ plot_avg_tensor_values <- function(tensor){
 plot_avg_tensor_values('FA')
 ```
 
-## Mean Diffusivity
+### Mean Diffusivity
+
+#### Densities {.tabset}
+
+```{r}
+vars <-df %>% 
+  select(ends_with('MD')) %>% 
+  colnames()
+dplots <- lapply(vars, plot_densities) %>% 
+  setNames(vars)
+```
+
+```{r, results='asis'}
+for (name in names(dplots)){
+  cat("#####", str_replace_all(name, "_", " "), "\n")
+  print(dplots[[name]])
+  cat("\n\n")
+}
+```
+
+#### Boxplot
 
 ```{r}
 plot_avg_tensor_values('MD')
 ```
 
-## Radial Diffusivity
+### Radial Diffusivity
+
+#### Densities {.tabset}
+
+```{r}
+vars <-df %>% 
+  select(ends_with('RD')) %>% 
+  colnames()
+dplots <- lapply(vars, plot_densities) %>% 
+  setNames(vars)
+```
+
+```{r, results='asis'}
+for (name in names(dplots)){
+  cat("#####",  str_replace_all(name, "_", " "), "\n")
+  print(dplots[[name]])
+  cat("\n\n")
+}
+```
+
+#### Boxplot
 
 ```{r}
 plot_avg_tensor_values('RD')
 ```
 
-## Axial Diffusivity
+### Axial Diffusivity
+
+#### Densities {.tabset}
+
+```{r}
+vars <-df %>% 
+  select(ends_with('AD')) %>% 
+  colnames()
+dplots <- lapply(vars, plot_densities) %>% 
+  setNames(vars)
+```
+
+```{r, results='asis'}
+for (name in names(dplots)){
+  cat("#####",  str_replace_all(name, "_", " "), "\n")
+  print(dplots[[name]])
+  cat("\n\n")
+}
+```
+
+#### Boxplot
 
 ```{r}
 plot_avg_tensor_values('AD')
 ```
 
-## Site effects
+## Testing of Site Effects
 
-```{r, warning=FALSE}
+```{r, include=FALSE, warning=FALSE}
+# not included
 get.r.sq = function(df){
 
  r.sq = numeric(0)
- for (v in tensor.names) { # global tensor.names
+ for (v in outcomes) { # global outcomes
    # deal with NAs
    res = tryCatch(summary(lm(df[,v ] ~ df$site))$r.squared, 
                   error = function(cond) return(NA))
    r.sq = c(r.sq, res)
  }
- names(r.sq) = tensor.names
+ names(r.sq) = outcomes
  return(r.sq)
 }
 
@@ -115,22 +320,20 @@ r_sq_df = df %>%
   bind_rows(.id='subject')
 
 r_sq_df %>% 
-  pivot_longer(cols=tensor.names, names_to = "segmentation", values_to = "R.squared") %>% 
+  pivot_longer(cols=outcomes, names_to = "segmentation", values_to = "R.squared") %>% 
   ggplot(aes(x=segmentation, y=R.squared)) + 
   geom_boxplot() + 
   coord_flip() + 
   ggtitle("R squared values of site effects") + 
   theme(plot.title = element_text(hjust = 0.5))
 # r_sq_df %>% 
-#   pivot_longer(cols=tensor.names, names_to = "segmentation", values_to = "R.squared") %>% 
+#   pivot_longer(cols=outcomes, names_to = "segmentation", values_to = "R.squared") %>% 
 #   ggplot(aes(x=segmentation, y=R.squared, color = subject)) + 
 #   geom_boxplot(aes(x=segmentation, y=R.squared, color = NULL)) +
 #   geom_jitter() +
 #   coord_flip() +
 #   ggtitle("R squared values of site effects (Gadgetron)") + theme(plot.title = element_text(hjust = 0.5))
 ```
-
-## Permutation Testing
 
 pseudo-F Ratio statistics: Intersite Variability / Intrasite Variability
 
@@ -140,7 +343,7 @@ null_dist = readRDS("results/avg_tensor_by_roi_wide_null.rds")
 ratio_stats
 ```
 
-Distribution of permutated pseudo-F stats:
+Distribution of permuted pseudo-F stats:
 
 ```{r, warning=FALSE}
 null_dist %>% 
@@ -171,27 +374,357 @@ test_ratio_stat = function(ratio.stats, null.dists){
 }
 
 p = 1 - test_ratio_stat(ratio_stats, null_dist)
-p_df <- data.frame(p.val = (10000*p + 1)/(1+10000)) 
+p_df <- data.frame(p_val = (10000*p + 1)/(1+10000)) 
 p_df %>% 
-  t() %>% 
+  mutate(p_val_fdr = p.adjust(p_val, method = 'fdr'))
+```
+
+## Mixed-Effect Models
+
+```{r}
+models <- outcomes %>% 
+  lapply(function(x) lmer(reformulate("(1|subject) + (1|site)", x), data=df)) %>% 
+  setNames(outcomes)
+icc_df <- models %>% 
+  lapply(performance::icc, by_group = TRUE) %>% 
+  bind_rows(.id = "outcome") %>% 
   as.data.frame()
 ```
 
-FDR-corrected:
 
 ```{r}
-p_df %>% 
-  mutate(p.val = p.adjust(p.val, method = 'fdr')) %>% 
-  t() %>% 
-  as.data.frame()
+icc_df %>% 
+  filter(Group == 'subject') %>% 
+  ggplot(aes(x=outcome, y=ICC)) + 
+  geom_point() + 
+  coord_flip() + 
+  ggtitle("ICC of Subject Random Effect") + 
+  ylim(0,1)
 ```
 
-Bonferroni-corrected:
+```{r}
+icc_df %>% 
+  filter(Group == 'site:subject') %>% 
+  ggplot(aes(x=outcome, y=ICC)) + 
+  geom_point() + 
+  coord_flip() + 
+  ggtitle("ICC of Site:Subject Random Effect") + 
+  ylim(0,1)
+```
+
+### Diagnostics {.tabset}
 
 ```{r}
-p_df %>% 
-  mutate(p.val = p.adjust(p.val, method = 'bonferroni')) %>% 
-  t() %>% 
-  as.data.frame()
+perf_mixed_model = function(model){
+  
+  list(summary = summary(model),
+       perf = performance::icc(model, by_group = TRUE),
+       shapiro.resid = shapiro.test(residuals(model)),
+       shapiro.subject = shapiro.test(coef(model)$`subject`[,1]),
+       `shapiro.site:subject` = shapiro.test(coef(model)$`site:subject`[,1]),
+       
+       qq.resid = car::qqPlot(residuals(model),dist="norm", main="Residuals"),
+       qq.ranef.subject = car::qqPlot(ranef(model)$subject[,1],dist="norm", main="Rand. Eff. subject"),
+       `qq.ranef.site:subject` = car::qqPlot(ranef(model)$`site:subject`[,1],dist="norm", main="Rand. Eff. site:subject"),
+       res.v.fit = ggplot(mapping = aes(y = resid(model), x = fitted(model))) + geom_abline(intercept = 0, slope = 0) + geom_point() + geom_smooth() + theme_bw()
+       )
+}
+```
+
+#### FA {.tabset}
+
+##### ATROPOS WM
+
+```{r}
+perf_mixed_model(models$ATROPOS_WM_FA)
+```
+
+##### ATROPOS GM
+
+```{r}
+perf_mixed_model(models$ATROPOS_GM_FA)
+```
+
+##### FAST WM
+
+```{r}
+perf_mixed_model(models$FAST_WM_FA)
+```
+
+##### FAST GM
+
+```{r}
+perf_mixed_model(models$FAST_GM_FA)
+```
+
+##### JLF WM
+
+```{r}
+perf_mixed_model(models$JLF_WM_FA)
+```
+
+##### JLF GM
+
+```{r}
+perf_mixed_model(models$JLF_GM_FA)
+```
+
+##### FIRST THAL
+
+```{r}
+perf_mixed_model(models$FIRST_THALAMUS_FA)
+```
+
+##### JLF THAL
+
+```{r}
+perf_mixed_model(models$JLF_THALAMUS_FA)
+```
+
+##### MIMOSA 
+
+```{r}
+perf_mixed_model(models$MIMOSA_LESION_FA)
+```
+
+#### MD {.tabset}
+
+##### ATROPOS WM
+
+```{r}
+perf_mixed_model(models$ATROPOS_WM_MD)
+```
+
+##### ATROPOS GM
+
+```{r}
+perf_mixed_model(models$ATROPOS_GM_MD)
+```
+
+##### FAST WM
+
+```{r}
+perf_mixed_model(models$FAST_WM_MD)
+```
+
+##### FAST GM
+
+```{r}
+perf_mixed_model(models$FAST_GM_MD)
+```
+
+##### JLF WM
+
+```{r}
+perf_mixed_model(models$JLF_WM_MD)
+```
+
+##### JLF GM
+
+```{r}
+perf_mixed_model(models$JLF_GM_MD)
+```
+
+##### FIRST THAL
+
+```{r}
+perf_mixed_model(models$FIRST_THALAMUS_MD)
+```
+
+##### JLF THAL
+
+```{r}
+perf_mixed_model(models$JLF_THALAMUS_MD)
+```
+
+##### MIMOSA 
+
+```{r}
+perf_mixed_model(models$MIMOSA_LESION_MD)
+```
+
+#### AD {.tabset}
+
+##### ATROPOS WM
+
+```{r}
+perf_mixed_model(models$ATROPOS_WM_AD)
+```
+
+##### ATROPOS GM
+
+```{r}
+perf_mixed_model(models$ATROPOS_GM_AD)
+```
+
+##### FAST WM
+
+```{r}
+perf_mixed_model(models$FAST_WM_AD)
+```
+
+##### FAST GM
+
+```{r}
+perf_mixed_model(models$FAST_GM_AD)
+```
+
+##### JLF WM
+
+```{r}
+perf_mixed_model(models$JLF_WM_AD)
+```
+
+##### JLF GM
+
+```{r}
+perf_mixed_model(models$JLF_GM_AD)
+```
+
+##### FIRST THAL
+
+```{r}
+perf_mixed_model(models$FIRST_THALAMUS_AD)
+```
+
+##### JLF THAL
+
+```{r}
+perf_mixed_model(models$JLF_THALAMUS_AD)
+```
+
+##### MIMOSA 
+
+```{r}
+perf_mixed_model(models$MIMOSA_LESION_AD)
+```
+
+#### RD {.tabset}
+
+##### ATROPOS WM
+
+```{r}
+perf_mixed_model(models$ATROPOS_WM_RD)
+```
+
+##### ATROPOS GM
+
+```{r}
+perf_mixed_model(models$ATROPOS_GM_RD)
+```
+
+##### FAST WM
+
+```{r}
+perf_mixed_model(models$FAST_WM_RD)
+```
+
+##### FAST GM
+
+```{r}
+perf_mixed_model(models$FAST_GM_RD)
+```
+
+##### JLF WM
+
+```{r}
+perf_mixed_model(models$JLF_WM_RD)
+```
+
+##### JLF GM
+
+```{r}
+perf_mixed_model(models$JLF_GM_RD)
+```
+
+##### FIRST THAL
+
+```{r}
+perf_mixed_model(models$FIRST_THALAMUS_RD)
+```
+
+##### JLF THAL
+
+```{r}
+perf_mixed_model(models$JLF_THALAMUS_RD)
+```
+
+##### MIMOSA 
+
+```{r}
+perf_mixed_model(models$MIMOSA_LESION_RD)
+```
+
+## Repeated Measures ANOVA
+
+```{r}
+library(rstatix)
+find_icc <- function(data){
+  
+  irr::icc(data,
+    model = "twoway", 
+    type = "agreement",
+    unit = "single")
+  
+}
+
+run_anova <- function (var){
+  df %>% 
+    filter(scan == '01') %>% 
+    anova_test(dv = var, wid = subject, within = site) %>% 
+    get_anova_table()
+}
+
+anovas <- outcomes %>% 
+  lapply(run_anova) %>% 
+  setNames(outcomes)
+
+
+data.frame(measure = names(anovas), 
+           F_stat = anovas %>% 
+             purrr::map(~ .x$F) %>% 
+             purrr::reduce(c),
+           p = anovas %>% 
+             purrr::map(~ .x$p) %>% 
+             purrr::reduce(c))
+
+```
+
+
+```{r}
+pair_df_list <- df %>% 
+  pivot_longer(where(is.numeric)) %>% 
+  split(list(.$site, .$name))
+
+# compute names for each pair_df
+df_names <- pair_df_list %>% 
+  purrr::map(~ .x %>% 
+               transmute(df_name = paste(site, name, sep="-")) %>% 
+               pull() %>% 
+               unique()
+             ) %>% 
+  purrr::reduce(c)
+# finish transformation
+pair_df_list <- pair_df_list %>% 
+  purrr::map(~ .x %>% 
+               pivot_wider(names_from = c('name', 'scan')) %>% 
+               select(where(is.numeric))
+               ) %>% 
+  setNames(df_names)
+
+icc_df <- pair_df_list %>% 
+  purrr::map(find_icc) %>% 
+  purrr::imap(~ data.frame(outcome = .y, 
+                          icc = .x$value, 
+                          lwr = .x$lbound,
+                          upr = .x$ubound,
+                          p_val = .x$p.value)) %>% 
+  dplyr::bind_rows(.id = 'outcome') %>% 
+  separate(outcome, into = c('site', 'outcome'), sep='-')
+  
+```
+
+```{r, results='asis'}
+icc_df
 ```
 

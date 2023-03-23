@@ -1,4 +1,5 @@
 suppressMessages(library(dplyr))
+suppressMessages(library(tidyr))
 set.seed(1979)
 
 setwd(rprojroot::find_rstudio_root_file())
@@ -62,8 +63,27 @@ permute_ratio_stat = function(seg_df, n.perms = 10000){
     bind_rows()
 }
 
-ratio.stat = get_ratio_stat(seg_df)
-null.dists = permute_ratio_stat(seg_df)
+ratio.stat = cbind(seg_df %>%
+                 select(!is.numeric, starts_with('ATROPOS')) %>% 
+                 unite(sub, subject, site, visit, sep = '-') %>% 
+                 filter(!sub %in% c('04001-NIH-01', '01003-NIH-01', '03002-NIH-02', '04003-NIH-01', '04001-BWH-02', '03001-BWH-01')) %>% 
+                 separate(sub, c('subject', 'site', 'visit')) %>% 
+                 get_ratio_stat(),
+               seg_df %>%
+                 select(-starts_with('ATROPOS')) %>% 
+                 get_ratio_stat()
+               )
+
+null.dists = cbind(seg_df %>%
+                 select(-starts_with('ATROPOS')) %>% 
+                 permute_ratio_stat(),
+               seg_df %>%
+                 select(!is.numeric, starts_with('ATROPOS')) %>% 
+                 unite(sub, subject, site, visit, sep = '-') %>% 
+                 filter(!sub %in% c('04001-NIH-01', '01003-NIH-01', '03002-NIH-02', '04003-NIH-01', '04001-BWH-02', '03001-BWH-01')) %>% 
+                 separate(sub, c('subject', 'site', 'visit')) %>% 
+                 permute_ratio_stat()
+               )
 
 saveRDS(ratio.stat, sprintf("results/%s_ratio_stat.rds", tools::file_path_sans_ext(basename(argv[1]))))
 saveRDS(null.dists, sprintf("results/%s_null.rds", tools::file_path_sans_ext(basename(argv[1]))))
