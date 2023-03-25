@@ -9,11 +9,12 @@ output:
     toc_float: True
     code_folding: hide
     df_print: paged
+    fig_width: 10
+    fig_height: 7.5
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE, rows.print = 15)
-knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE, cache=TRUE, rows.print = 15)
 ```
 
 ```{r, warning=FALSE}
@@ -22,9 +23,10 @@ library(tidyr)
 library(ggplot2)
 library(stringr)
 library(lme4)
+library(rstatix)
 
 options(scipen=999)
-df = read.csv('avg_tensor_by_roi_wide.csv',
+df = read.csv(here::here('avg_tensor_by_roi_wide.csv'),
               colClasses = c('subject' = 'factor',
                              'site' = 'factor',
                              'visit' = 'factor')) %>% 
@@ -32,18 +34,6 @@ df = read.csv('avg_tensor_by_roi_wide.csv',
 outcomes = df %>% 
   select(where(is.numeric)) %>% 
   colnames
-
-# replace ATROPOS measures with NA for select images (segmentation failed)
-
-atropos_cols <- df %>% 
-  select(contains('ATROPOS')) %>% 
-  colnames()
-df[(df$subject == '04001' & df$site == 'NIH' & df$scan == '01') |
-   (df$subject == '01003' & df$site == 'NIH' & df$scan == '01') |
-   (df$subject == '03002' & df$site == 'NIH' & df$scan == '02') |
-   (df$subject == '04003' & df$site == 'NIH' & df$scan == '01') |
-   (df$subject == '04001' & df$site == 'BWH' & df$scan == '02') |
-   (df$subject == '03001' & df$site == 'BWH' & df$scan == '01'), atropos_cols] <- NA
 ```
 
 ## Summary 
@@ -52,7 +42,8 @@ The purpose of the DTIMSCAMRAS study is to test for site effects on DTI metrics 
 
 ### Preprocessing
 
-To preprocess imaging data, [`qsiprep`](https://qsiprep.readthedocs.io/en/latest/) was used for bias correction, skull-stripping and co-registration of the T1s and DWIs, and specialized denoising and artifact correction for the DWIs. Then, DTIFIT was used to compute the following [scalar maps](https://www.diffusion-imaging.com/2013/01/relation-between-neural-microstructure.html):
+To preprocess imaging data, [`qsiprep`](https://qsiprep.readthedocs.io/en/latest/) was used for bias correction, skull-stripping and co-registration of the T1s and DWIs, and specialized denoising and artifact correction for the DWIs. Then, DTIFIT was used to compute the following [scalar maps](https://www.diffusion-imaging.com/2013/01/relation-between-neural-microstructure.html):  
+
 * Fractional Anisotropy
 * Mean Diffusivity
 * Axial Diffusivity
@@ -77,11 +68,13 @@ data.frame(OUTCOME = outcomes) %>%
   separate(OUTCOME, c("SEGMENTATION", "ROI", "SCALAR"), remove = FALSE)
 ```
 
-Note the general <SEGMENTATION>_<ROI>_<SCALAR> format; for example, the ATROPOS_GM_AD variable denotes the average Axial Diffusivity (AD) across the Gray Matter (GM) regions defined by the Atropos Segmentation.
+Note the general <SEGMENTATION>_<ROI>_<SCALAR> format: for example, the ATROPOS_GM_AD variable denotes the average Axial Diffusivity (AD) across the Gray Matter (GM) regions defined by the Atropos Segmentation.
 
 ### Testing site effects
 
-A permutation-based F-test was used to test for site effects in the absence of parametric assumptions. For each subject, the absolute difference between all possible pairs of intra-site and inter-site measures were computed. For instance, take the first row of the subject data.frame below, which has BWH as the "reference site": the absolute differences between that row and the 6 non-BWH rows are computed for $y$——this process is repeated for all rows (and the results averaged) to arrive to the average inter-site difference for this subject; for the average intra-site differences the absolute difference of the 4 intrasite pairs are averaged.
+#### Permutation-Based F-test
+
+A permutation-based F-test was used to test for site effects. For each subject, the absolute difference between all possible pairs of intra-site and inter-site measures were computed. For instance, take the first row of the subject data.frame below, which has BWH as the "reference site": the absolute differences between that row and the 6 non-BWH rows are computed for $y$——this process is repeated for all rows (and the results averaged) to arrive to the average inter-site difference for this subject; for the average intra-site differences the absolute difference of the 4 intrasite pairs are averaged.
 
 ```{r}
 df %>% 
@@ -96,14 +89,48 @@ $$
 F = \frac{\overline{MAD_{B}}}{\overline{MAD_{W}}}
 $$
 
-**Key Findings:** Permutation tests revealed significant site effects in that all 36 outcomes. 
+For each metric, the observed test statistic was compared to a distribution of test statistics derived from 10000 permutations (i.e. a null distribution). The proportion of null results higher than the observed test statistic served as a preliminary p-value $p_0$. To prevent p-values of 0 (when the observed statistic was higher than all permuted results), the p-value was shifted using the following formula:
+
+$$ p = \frac{10000*p_0 + 1}{10000 + 1}$$
+
+#### Crossed-design Mixed Linear Models
+
+As an additional test of site effects, mixed models were performed corresponding to a crossed design using the `lmer` function of the `lme4` package. For each outcome variable, two mixed-effects models were fitted: The formula for the base model includes a random intercept for site as well as a random intercept for subject. The formula for the extended model also includes these terms in addition to a fixed effect term for site. 
+
+Base Model:
+
+```
+y ~ (1|subject) + (1|site)
+```
+
+Extended model:
+
+```
+y ~ site + (1|subject) + (1|site)
+```
+
+For each outcome, these two models were compared through a deviance test using the `anova` function in R. P-values for these tests are reported as a test of site effects. 
+
+#### Repeated-Measures ANOVA
+
+As yet another test of site effects, a repeated-measures ANOVA was performed for each metric. Here, only data from scan 1 was used. The models were run using the `anova_test` function from the `rstatix` package. In these models, site was specified as a within-subject factor. 
+
+## Key Findings 
+- Permutation tests revealed significant site effects in that all 36 outcomes before and after FDR adjustment. 
+- For mixed models, most outcome variables (31 out of 36) show a significant test before and after FDR adjustment indicating the presence of site effects.
+- For repeated-measures ANOVA, 23 out of 36 metrics show significant effect of site on subjects measures indicating. 
+- Permutation-based F-tests were more sensitive to site effects than other methods. Repeated-measure ANOVA was the least sensitive of the three methods. 
+
+## Questions for follow up  
+
+- The data included in this report was non-distortion corrected data for Penn, NIH and BWH; while Hopkins data was all distortion correct. Should the analysis be redone for non-Hopkins data? Note: DTI data was only collected without distortion correction [TODO: double check] in non-Hopkins data. 
+- Manual Lesion segmentations are not included in this report. Should these be included in this assessment?
 
 ## Data Inventory
 
+Subjects 03001 and 03002 did not complete imaging at all 4 sites. Subject 03001 completed imaging at Penn and BWH only and 03002 completed imaging at BWH, Hopkins, and the NIH only.
 
-Subjects 03001 and 03002 didn’t complete imaging at all 4 sites. Subject 03001 completed imaging at Penn and BWH only and 03002 completed imaging at BWH, Hopkins, and the NIH only.
-
-Subject 02001 is missing missing DTI data from their NIH visit and is therefore excluded from this analysis. 
+Subject 02001 is missing DTI data from their NIH visit.
 
 ### Scans at site per subject
 
@@ -123,22 +150,13 @@ t_df
 
 ### For Atropos (substracting failed segmentations)
 
-Atropos segmentation failed for 6 images: `r knitr::combine_words(c('04001NIH01', '01003NIH01', '03002NIH02', '04003NIH01', '04001BWH02', '03001BWH01'))`.
+Atropos segmentation failed for 6 images: `r knitr::combine_words(c('04001NIH01', '01003NIH01', '03002NIH02', '04003NIH01', '04001BWH02', '03001BWH01'))`. 
 
-
-![atropos fail](misc/atropos_fail.png)
-
-```{r, fig.show='hold', fig.align='center', out.width="49%", out.height="20%"}
-#knitr::include_graphics(here::here(c('misc/atropos_fail.png', 'misc/atropos_success.png')))
-```
-```{r}
-#knitr::include_graphics("misc/atropos_fail.png")
+```{r, fig.show='hold', out.width="45%", out.height="20%", fig.cap="Left: Example of successful Atropos segmentation; Right: Example of a failed Atropos segmentation"}
+knitr::include_graphics(here::here(c('misc/atropos_success.png', 'misc/atropos_fail.png')))
 ```
 
-
-```{r, fig.show='hold', fig.align='center', out.width="49%", out.height="20%"}
-#knitr::include_graphics("misc/atropos_success.png")
-```
+The following table excludes the failed atropos segmentations. Note subject 03001 only has 3 images after excluding failed atropos segmentations. 
 
 ```{r}
 t_df <- df %>% 
@@ -158,13 +176,15 @@ t_df[is.na(t_df)] <- "Column Totals"
 t_df
 ```
 
+The failed atropos segmentations are included in the following visualizations but were excluded for the site effects tests. 
+
 ## Visualizations 
 
 ### Fractional Anisotropy 
 
 #### Densities {.tabset}
 
-Densities are colored by site, while the black line represents the overall density aggregated across sites. 
+Densities are colored by site, while the black line represents the overall density aggregated across sites. Distribution of the different sites tend to cluster together except for JLF Thalamus.
 
 ```{r}
 plot_densities <- function(var){
@@ -191,7 +211,10 @@ for (name in names(dplots)){
 }
 ```
 
-#### Boxplots
+#### Box plots
+
+Box plots show difference in medians across sites for most variables.  
+Additionally, note the severe outliers in the ATROPOS metrics which correspond to the failed segmentations. For FIRST THALAMUS, subject 01002 could be considered an outlier; their FA values are consistent across sites and scans, however, suggesting this variation is meaningful and that this subject should be retained. 
 
 ```{r, warning=FALSE}
 plot_avg_tensor_values <- function(tensor){
@@ -202,7 +225,7 @@ plot_avg_tensor_values <- function(tensor){
     unite(segmentation, segmentation, roi, sep = " ") %>% 
     ggplot(aes(x=site, y=average)) + 
     geom_boxplot(outlier.shape = NA) + 
-    geom_jitter(aes(color = subject, shape=scan), alpha=0.6) +
+    geom_jitter(aes(color = subject, shape=scan), alpha=0.5) +
     #facet_grid(site~.) + 
     facet_grid(segmentation ~ .) +
     coord_flip() +
@@ -222,6 +245,9 @@ plot_avg_tensor_values('FA')
 
 #### Densities {.tabset}
 
+For Mean Diffusivity, distributions vary more widely across sites. In particular, MIMOSA LESION MD values are quite different for Hopkins data. 
+
+
 ```{r}
 vars <-df %>% 
   select(ends_with('MD')) %>% 
@@ -240,6 +266,8 @@ for (name in names(dplots)){
 
 #### Boxplot
 
+As before, medians appear to be different across sites. 
+
 ```{r}
 plot_avg_tensor_values('MD')
 ```
@@ -247,6 +275,8 @@ plot_avg_tensor_values('MD')
 ### Radial Diffusivity
 
 #### Densities {.tabset}
+
+Radial Diffusivity also shows some variations across sites (perhaps less than MD). JLF GM RD in NIH shows multiple peaks, and JLF WM RD shows skewed distributions for all sites, pointing to potential non-normality. As before the metric for MIMOSA shows a different distribution for Hopkins data. 
 
 ```{r}
 vars <-df %>% 
@@ -266,6 +296,8 @@ for (name in names(dplots)){
 
 #### Boxplot
 
+As before, medians appear to be differet across sites. 
+
 ```{r}
 plot_avg_tensor_values('RD')
 ```
@@ -273,6 +305,8 @@ plot_avg_tensor_values('RD')
 ### Axial Diffusivity
 
 #### Densities {.tabset}
+
+For Axial Diffusivity, Hopkins distributions show marked differences across most ROIs compared to other sites. The difference is quite pronounced for MIMOSA.  
 
 ```{r}
 vars <-df %>% 
@@ -292,14 +326,29 @@ for (name in names(dplots)){
 
 #### Boxplot
 
+As before, medians show differences, particularly for Hopkins.
+
 ```{r}
 plot_avg_tensor_values('AD')
 ```
 
-## Testing of Site Effects
+## Permutation Testing of Site Effects
+
+```{r}
+# replace ATROPOS measures with NA for select images (segmentation failed)
+atropos_cols <- df %>% 
+  select(contains('ATROPOS')) %>% 
+  colnames()
+df[(df$subject == '04001' & df$site == 'NIH' & df$scan == '01') |
+   (df$subject == '01003' & df$site == 'NIH' & df$scan == '01') |
+   (df$subject == '03002' & df$site == 'NIH' & df$scan == '02') |
+   (df$subject == '04003' & df$site == 'NIH' & df$scan == '01') |
+   (df$subject == '04001' & df$site == 'BWH' & df$scan == '02') |
+   (df$subject == '03001' & df$site == 'BWH' & df$scan == '01'), atropos_cols] <- NA
+```
 
 ```{r, include=FALSE, warning=FALSE}
-# not included
+# RSQUARE of per subject models: NOT INCLUDED IN FINAL OUTPUT
 get.r.sq = function(df){
 
  r.sq = numeric(0)
@@ -335,15 +384,12 @@ r_sq_df %>%
 #   ggtitle("R squared values of site effects (Gadgetron)") + theme(plot.title = element_text(hjust = 0.5))
 ```
 
-pseudo-F Ratio statistics: Intersite Variability / Intrasite Variability
+The permutation-based F-test was carried out as previously described. The observed F-statistic for each of the metrics is plotted below as a black dot, while the distribution of permuted test statistics is shown as a white violin plot. All metrics showed significant site effects. 
 
 ```{r}
-ratio_stats = readRDS("results/avg_tensor_by_roi_wide_ratio_stat.rds")
-null_dist = readRDS("results/avg_tensor_by_roi_wide_null.rds")
-ratio_stats
+ratio_stats = readRDS(here::here("results/avg_tensor_by_roi_wide_ratio_stat.rds"))
+null_dist = readRDS(here::here("results/avg_tensor_by_roi_wide_null.rds"))
 ```
-
-Distribution of permuted pseudo-F stats:
 
 ```{r, warning=FALSE}
 null_dist %>% 
@@ -356,7 +402,7 @@ null_dist %>%
   coord_flip()
 ```
 
-P-value of pseudo-F stat:
+The observed values ("black dots") are represented below in table form along with their unadjusted and adjusted p-values:
 
 ```{r}
 test_ratio_stat = function(ratio.stats, null.dists){
@@ -375,296 +421,89 @@ test_ratio_stat = function(ratio.stats, null.dists){
 
 p = 1 - test_ratio_stat(ratio_stats, null_dist)
 p_df <- data.frame(p_val = (10000*p + 1)/(1+10000)) 
-p_df %>% 
-  mutate(p_val_fdr = p.adjust(p_val, method = 'fdr'))
+
+perm_df <- cbind(
+  ratio_stats %>% 
+    pivot_longer(everything(), names_to = 'outcome', values_to = 'observed_statistic'),
+  p_df %>% 
+    mutate(p_val_fdr = p.adjust(p_val, method = 'fdr'))
+) 
+
+rownames(perm_df) <- NULL
+perm_df
 ```
 
 ## Mixed-Effect Models
 
+Two mixed models (a base and an extended model) were performed as described above. The p-values for the model comparison are arranged in increasing order below. 31 out of 36 metrics show a significant difference.
+
 ```{r}
 models <- outcomes %>% 
+  lapply(function(x) lmer(reformulate("site + (1|subject) + (1|site)", x), data=df)) %>% 
+  setNames(outcomes)
+```
+
+```{r}
+models_0 <- outcomes %>% 
   lapply(function(x) lmer(reformulate("(1|subject) + (1|site)", x), data=df)) %>% 
   setNames(outcomes)
+```
+
+```{r}
+anovas <- purrr::map2(models, models_0, ~ anova(.x, .y)) # deviance test between the two models
+# pull p.values from all tests
+p_vals <- anovas %>% 
+  purrr::map(~ broom::tidy(.x) %>%
+               pull(p.value) %>% 
+               na.omit()) %>% 
+  purrr::reduce(c)
+
+anova_test_df <- data.frame(outcome = names(anovas), p_val = p_vals) %>% 
+  arrange(p_val) %>% 
+  mutate(p_val_fdr = p.adjust(p_val, method = 'fdr'))
+anova_test_df
+```
+
+Note that, prior to FDR-adjustment, most outcome variables show a significant test indicating the presence of site effects. However, after FDR-adjustment, the vast majority of tests become non-significant. 
+
+
+```{r, include=FALSE}
 icc_df <- models %>% 
   lapply(performance::icc, by_group = TRUE) %>% 
   bind_rows(.id = "outcome") %>% 
   as.data.frame()
-```
 
-
-```{r}
 icc_df %>% 
   filter(Group == 'subject') %>% 
   ggplot(aes(x=outcome, y=ICC)) + 
-  geom_point() + 
+  geom_col() + 
   coord_flip() + 
   ggtitle("ICC of Subject Random Effect") + 
   ylim(0,1)
 ```
 
-```{r}
+```{r, include=FALSE}
 icc_df %>% 
-  filter(Group == 'site:subject') %>% 
+  filter(Group == 'site') %>% 
   ggplot(aes(x=outcome, y=ICC)) + 
-  geom_point() + 
+  geom_col() + 
   coord_flip() + 
-  ggtitle("ICC of Site:Subject Random Effect") + 
+  ggtitle("ICC of Site Random Effect") + 
   ylim(0,1)
 ```
 
-### Diagnostics {.tabset}
+## Repeated-Measures ANOVA
+
+Repeated-Measures ANOVAs were performed as described above. Below the table shows the F-statistic, effect size (generalized eta squared) and p-values (adjusted and unadjusted). 23 out of 36 metrics show significant effect of site after FDR adjustment. 
 
 ```{r}
-perf_mixed_model = function(model){
-  
-  list(summary = summary(model),
-       perf = performance::icc(model, by_group = TRUE),
-       shapiro.resid = shapiro.test(residuals(model)),
-       shapiro.subject = shapiro.test(coef(model)$`subject`[,1]),
-       `shapiro.site:subject` = shapiro.test(coef(model)$`site:subject`[,1]),
-       
-       qq.resid = car::qqPlot(residuals(model),dist="norm", main="Residuals"),
-       qq.ranef.subject = car::qqPlot(ranef(model)$subject[,1],dist="norm", main="Rand. Eff. subject"),
-       `qq.ranef.site:subject` = car::qqPlot(ranef(model)$`site:subject`[,1],dist="norm", main="Rand. Eff. site:subject"),
-       res.v.fit = ggplot(mapping = aes(y = resid(model), x = fitted(model))) + geom_abline(intercept = 0, slope = 0) + geom_point() + geom_smooth() + theme_bw()
-       )
-}
-```
-
-#### FA {.tabset}
-
-##### ATROPOS WM
-
-```{r}
-perf_mixed_model(models$ATROPOS_WM_FA)
-```
-
-##### ATROPOS GM
-
-```{r}
-perf_mixed_model(models$ATROPOS_GM_FA)
-```
-
-##### FAST WM
-
-```{r}
-perf_mixed_model(models$FAST_WM_FA)
-```
-
-##### FAST GM
-
-```{r}
-perf_mixed_model(models$FAST_GM_FA)
-```
-
-##### JLF WM
-
-```{r}
-perf_mixed_model(models$JLF_WM_FA)
-```
-
-##### JLF GM
-
-```{r}
-perf_mixed_model(models$JLF_GM_FA)
-```
-
-##### FIRST THAL
-
-```{r}
-perf_mixed_model(models$FIRST_THALAMUS_FA)
-```
-
-##### JLF THAL
-
-```{r}
-perf_mixed_model(models$JLF_THALAMUS_FA)
-```
-
-##### MIMOSA 
-
-```{r}
-perf_mixed_model(models$MIMOSA_LESION_FA)
-```
-
-#### MD {.tabset}
-
-##### ATROPOS WM
-
-```{r}
-perf_mixed_model(models$ATROPOS_WM_MD)
-```
-
-##### ATROPOS GM
-
-```{r}
-perf_mixed_model(models$ATROPOS_GM_MD)
-```
-
-##### FAST WM
-
-```{r}
-perf_mixed_model(models$FAST_WM_MD)
-```
-
-##### FAST GM
-
-```{r}
-perf_mixed_model(models$FAST_GM_MD)
-```
-
-##### JLF WM
-
-```{r}
-perf_mixed_model(models$JLF_WM_MD)
-```
-
-##### JLF GM
-
-```{r}
-perf_mixed_model(models$JLF_GM_MD)
-```
-
-##### FIRST THAL
-
-```{r}
-perf_mixed_model(models$FIRST_THALAMUS_MD)
-```
-
-##### JLF THAL
-
-```{r}
-perf_mixed_model(models$JLF_THALAMUS_MD)
-```
-
-##### MIMOSA 
-
-```{r}
-perf_mixed_model(models$MIMOSA_LESION_MD)
-```
-
-#### AD {.tabset}
-
-##### ATROPOS WM
-
-```{r}
-perf_mixed_model(models$ATROPOS_WM_AD)
-```
-
-##### ATROPOS GM
-
-```{r}
-perf_mixed_model(models$ATROPOS_GM_AD)
-```
-
-##### FAST WM
-
-```{r}
-perf_mixed_model(models$FAST_WM_AD)
-```
-
-##### FAST GM
-
-```{r}
-perf_mixed_model(models$FAST_GM_AD)
-```
-
-##### JLF WM
-
-```{r}
-perf_mixed_model(models$JLF_WM_AD)
-```
-
-##### JLF GM
-
-```{r}
-perf_mixed_model(models$JLF_GM_AD)
-```
-
-##### FIRST THAL
-
-```{r}
-perf_mixed_model(models$FIRST_THALAMUS_AD)
-```
-
-##### JLF THAL
-
-```{r}
-perf_mixed_model(models$JLF_THALAMUS_AD)
-```
-
-##### MIMOSA 
-
-```{r}
-perf_mixed_model(models$MIMOSA_LESION_AD)
-```
-
-#### RD {.tabset}
-
-##### ATROPOS WM
-
-```{r}
-perf_mixed_model(models$ATROPOS_WM_RD)
-```
-
-##### ATROPOS GM
-
-```{r}
-perf_mixed_model(models$ATROPOS_GM_RD)
-```
-
-##### FAST WM
-
-```{r}
-perf_mixed_model(models$FAST_WM_RD)
-```
-
-##### FAST GM
-
-```{r}
-perf_mixed_model(models$FAST_GM_RD)
-```
-
-##### JLF WM
-
-```{r}
-perf_mixed_model(models$JLF_WM_RD)
-```
-
-##### JLF GM
-
-```{r}
-perf_mixed_model(models$JLF_GM_RD)
-```
-
-##### FIRST THAL
-
-```{r}
-perf_mixed_model(models$FIRST_THALAMUS_RD)
-```
-
-##### JLF THAL
-
-```{r}
-perf_mixed_model(models$JLF_THALAMUS_RD)
-```
-
-##### MIMOSA 
-
-```{r}
-perf_mixed_model(models$MIMOSA_LESION_RD)
-```
-
-## Repeated Measures ANOVA
-
-```{r}
-library(rstatix)
+options(scipen=999)
 find_icc <- function(data){
   
   irr::icc(data,
-    model = "twoway", 
-    type = "agreement",
-    unit = "single")
+           model = "twoway", 
+           type = "agreement",
+           unit = "single")
   
 }
 
@@ -684,12 +523,18 @@ data.frame(measure = names(anovas),
            F_stat = anovas %>% 
              purrr::map(~ .x$F) %>% 
              purrr::reduce(c),
+           ges = anovas %>% 
+             purrr::map(~ .x$ges) %>% 
+             purrr::reduce(c),
            p = anovas %>% 
              purrr::map(~ .x$p) %>% 
-             purrr::reduce(c))
+             purrr::reduce(c)) %>% 
+  arrange(p) %>% 
+  mutate(p_val_fdr = p.adjust(p, method = "fdr"))
 
 ```
 
+ICC between scan 1 and scan 2 was calculated for each site. Results are shown below. Most sites show high agreement between scans across metrics. 
 
 ```{r}
 pair_df_list <- df %>% 
@@ -702,29 +547,30 @@ df_names <- pair_df_list %>%
                transmute(df_name = paste(site, name, sep="-")) %>% 
                pull() %>% 
                unique()
-             ) %>% 
+  ) %>% 
   purrr::reduce(c)
 # finish transformation
 pair_df_list <- pair_df_list %>% 
   purrr::map(~ .x %>% 
                pivot_wider(names_from = c('name', 'scan')) %>% 
                select(where(is.numeric))
-               ) %>% 
+  ) %>% 
   setNames(df_names)
 
 icc_df <- pair_df_list %>% 
   purrr::map(find_icc) %>% 
   purrr::imap(~ data.frame(outcome = .y, 
-                          icc = .x$value, 
-                          lwr = .x$lbound,
-                          upr = .x$ubound,
-                          p_val = .x$p.value)) %>% 
+                           icc = .x$value, 
+                           lwr = .x$lbound,
+                           upr = .x$ubound,
+                           p_val = .x$p.value)) %>% 
   dplyr::bind_rows(.id = 'outcome') %>% 
   separate(outcome, into = c('site', 'outcome'), sep='-')
-  
+
 ```
 
 ```{r, results='asis'}
-icc_df
+options(scipen=999)
+icc_df 
 ```
 
