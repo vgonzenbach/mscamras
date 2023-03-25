@@ -1,0 +1,413 @@
+---
+title: "Examining site effects in DTIMSCAMRAS"
+author: "Virgilio Gonzenbach"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    theme: united
+    toc: True
+    toc_float: True
+    code_folding: hide
+    df_print: paged
+    fig_width: 10
+    fig_height: 7.5
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE, cache=TRUE, rows.print = 15)
+```
+
+```{r, warning=FALSE}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(stringr)
+library(lme4)
+library(rstatix)
+
+options(scipen=999)
+df = read.csv(here::here('avg_tensor_by_roi_wide.csv'),
+              colClasses = c('subject' = 'factor',
+                             'site' = 'factor',
+                             'visit' = 'factor')) %>% 
+  rename(scan = visit)
+outcomes = df %>% 
+  select(where(is.numeric)) %>% 
+  colnames
+```
+
+## Summary 
+
+The purpose of the DTIMSCAMRAS study is to test for site effects on DTI metrics of different brain regions in the context of a traveling subjects design with a harmonized imaging protocol. Participants (n=11) with stable Multiple Sclerosis (MS) were scanned in 4 different locations: National Institute of Health (NIH), Brigham and Women's Hospital (BWH), Johns Hopkins University (Hopkins), and The University of Pennsylvania (Penn). Two scans were collected per site visit, and participants were re-positioned between scans. Penn, BWH and NIH used Siemens scanners, while Hopkins used a Phillips scanner. The modalities that were collected include T1s (MPRAGE), FLAIR, and Diffusion-weighted images (DWI). 
+
+### Preprocessing
+
+To preprocess imaging data, [`qsiprep`](https://qsiprep.readthedocs.io/en/latest/) was used for bias correction, skull-stripping and co-registration of the T1s and DWIs, and specialized denoising and artifact correction for the DWIs. Then, DTIFIT was used to compute the following [scalar maps](https://www.diffusion-imaging.com/2013/01/relation-between-neural-microstructure.html):  
+
+* Fractional Anisotropy
+* Mean Diffusivity
+* Axial Diffusivity
+* Radial Diffusivity
+
+Concurrently, several segmentation pipelines were used on the T1s (+ FLAIRs in the case of MIMOSA) with the purpose of defining particular regions of interest (ROIs):
+
+* White Matter and Gray Matter Segmentation methods:
+  + ANTs ATROPOS
+  + FSL FAST
+  + Multi-Atlas Segmentation with Joint Label Fusion using the MUSE templates (JLF WM and JLF GM)
+* Thalamus Segmentation
+  + FSL FIRST
+  + Multi-Atlas Segmentation with Joint Label Fusion using the OASIS templates (JLF THALAMUS)
+* Lesion Segmentation methods:
+  + MIMOSA
+  
+The segmentation results were used to average the scalar maps across all voxels belonging to each of the ROIs. The 36 resulting metrics make up the set of outcome variables which are the focus of the site effects test. Below, the outcome variables are listed. 
+
+```{r}
+data.frame(OUTCOME = outcomes) %>% 
+  separate(OUTCOME, c("SEGMENTATION", "ROI", "SCALAR"), remove = FALSE)
+```
+
+Note the general <SEGMENTATION>_<ROI>_<SCALAR> format: for example, the ATROPOS_GM_AD variable denotes the average Axial Diffusivity (AD) across the Gray Matter (GM) regions defined by the Atropos Segmentation.
+
+### Testing site effects
+
+#### Permutation-Based F-test
+
+A permutation-based F-test was used to test for site effects. For each subject, the absolute difference between all possible pairs of intra-site and inter-site measures were computed. For instance, take the first row of the subject data.frame below, which has BWH as the "reference site": the absolute differences between that row and the 6 non-BWH rows are computed for $y$——this process is repeated for all rows (and the results averaged) to arrive to the average inter-site difference for this subject; for the average intra-site differences the absolute difference of the 4 intrasite pairs are averaged.
+
+```{r}
+df %>% 
+  filter(subject == '01001') %>% 
+  select(!where(is.numeric), ATROPOS_GM_AD) %>% 
+  rename(y = ATROPOS_GM_AD)
+```
+
+These differences were averaged across all subjects resulting in the Mean Absolute Difference Between Sites ($\overline{MAD_{B}}$) and the Mean Absolute Difference Within Sites ($\overline{MAD_{W}}$). The test statistic is composed of their ratio:
+
+$$
+F = \frac{\overline{MAD_{B}}}{\overline{MAD_{W}}}
+$$
+
+For each metric, the observed test statistic was compared to a distribution of test statistics derived from 10000 permutations (i.e. a null distribution). The proportion of null results higher than the observed test statistic served as a preliminary p-value $p_0$. To prevent p-values of 0 (when the observed statistic was higher than all permuted results), the p-value was shifted using the following formula:
+
+$$ p = \frac{10000*p_0 + 1}{10000 + 1}$$
+
+[Source code](https://github.com/vgonzenbach/mscamras/tree/dti) for this project can be found on GitHub.
+
+## Key Findings 
+
+- Permutation tests revealed significant site effects in all 36 outcomes before and after FDR adjustment. 
+
+## Questions for follow up  
+
+- The data included in this report was non-distortion corrected data for Penn, NIH and BWH; while Hopkins data was all distortion corrected. Should the analysis be redone for non-Hopkins data? Note: DTI data was only collected **without** distortion correction in non-Hopkins sites. 
+- Manual lesion segmentations are not included in this report. Should these be included in this assessment?
+- It is unclear to what extent potential segmentation differences across sites might contribute to site effects, i.e. to what extent do site differences stem from ROI coverage differences (due to scanner effects on the T1s), and to what extent are the differences due to scanner effects on DWI images? 
+
+## Data Inventory
+
+Subjects 03001 and 03002 did not complete imaging at all 4 sites. Subject 03001 completed imaging at Penn and BWH only and 03002 completed imaging at BWH, Hopkins, and the NIH only.
+
+Subject 02001 is missing DTI data from their NIH visit.
+
+### Scans at site per subject
+
+```{r}
+t_df <- df %>% 
+   count(subject, site, .drop = FALSE) %>% 
+  tidyr::pivot_wider(names_from = site, values_from = n) %>% 
+  mutate(`Row Totals` = BWH + Hopkins + NIH + Penn) 
+t_df <- t_df %>% 
+  summarize(across(where(is.integer), sum)) %>% 
+  bind_rows(t_df, .) %>% 
+  mutate(across(where(is.factor), as.character))
+t_df[is.na(t_df)] <- "Column Totals"
+t_df
+```
+
+
+### For Atropos (substracting failed segmentations)
+
+Atropos segmentation failed for 6 images: `r knitr::combine_words(c('04001NIH01', '01003NIH01', '03002NIH02', '04003NIH01', '04001BWH02', '03001BWH01'))`. 
+
+```{r, fig.show='hold', out.width="45%", out.height="20%", fig.cap="Left: Example of successful Atropos segmentation; Right: Example of a failed Atropos segmentation with one ROI missing"}
+knitr::include_graphics(here::here(c('misc/atropos_success.png', 'misc/atropos_fail.png')))
+```
+
+The following table excludes the failed atropos segmentations. Note subject 03001 only has 3 images after excluding failed atropos segmentations. 
+
+```{r}
+t_df <- df %>% 
+  unite(sub, subject, site, scan, sep = '-') %>%
+  filter(!sub %in% c('04001-NIH-01', '01003-NIH-01', '03002-NIH-02', '04003-NIH-01', '04001-BWH-02', '03001-BWH-01')) %>%
+  separate(sub, c('subject', 'site', 'scan')) %>%
+  mutate_if(is.character, as.factor) %>% 
+  count(subject, site, .drop = FALSE) %>% 
+  tidyr::pivot_wider(names_from = site, values_from = n) %>% 
+  mutate(`Row Totals` = BWH + Hopkins + NIH + Penn)
+
+t_df <- t_df %>% 
+  summarize(across(where(is.integer), sum)) %>% 
+  bind_rows(t_df, .) %>% 
+  mutate(across(where(is.factor), as.character))
+t_df[is.na(t_df)] <- "Column Totals"
+t_df
+```
+
+The failed atropos segmentations are included in the following visualizations but were excluded for the site effects tests. 
+
+## Visualizations 
+
+### Fractional Anisotropy 
+
+#### Densities {.tabset}
+
+Densities are colored by site, while the black line represents the overall density aggregated across sites. Distribution of the different sites tend to cluster together except for JLF Thalamus. Additionally, note the long tails caused by outliers in the ATROPOS distributions.
+
+```{r}
+plot_densities <- function(var){
+  df %>% 
+    ggplot(aes_string(x=var, color='site')) + 
+    geom_density() + 
+    stat_density(aes_string(x = var), geom = "line", color = "black") +
+    theme_bw() + 
+    xlab(str_replace_all(var, "_", " "))
+}
+
+vars <-df %>% 
+  select(ends_with('FA')) %>% 
+  colnames()
+dplots <- lapply(vars, plot_densities) %>% 
+  setNames(vars)
+```
+
+```{r, results='asis'}
+for (name in names(dplots)){
+  cat("#####",  str_replace_all(name, "_", " "), "\n")
+  print(dplots[[name]])
+  cat("\n\n")
+}
+```
+
+#### Box plots
+
+Box plots show difference in medians across sites for most variables.  
+Additionally, note the severe outliers in the ATROPOS metrics which correspond to the failed segmentations. For FIRST THALAMUS, subject 01002 could be considered an outlier; their FA values are consistent across sites and scans, however, suggesting this variation is meaningful and that this subject should be retained. 
+
+```{r, warning=FALSE}
+plot_avg_tensor_values <- function(tensor){
+  df %>% 
+    select(!is.numeric, ends_with(tensor)) %>% 
+    pivot_longer(ends_with(tensor), names_to = 'seg', values_to = 'average') %>% 
+    separate(seg, into = c('segmentation', 'roi', 'tensor')) %>% 
+    unite(segmentation, segmentation, roi, sep = " ") %>% 
+    ggplot(aes(x=site, y=average)) + 
+    geom_boxplot(outlier.shape = NA) + 
+    geom_jitter(aes(color = subject, shape=scan), alpha=0.5) +
+    #facet_grid(site~.) + 
+    facet_grid(segmentation ~ .) +
+    coord_flip() +
+    ggtitle(sprintf("Mean %s in ROI by site", tensor)) +
+    theme_bw() + 
+    # theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust=1)) +
+    scale_x_discrete(expand = c(.00000001, .00000001)) +
+    xlab("") + 
+    ylab("") + 
+    theme(strip.text.y = element_text(angle = 0))
+}
+
+plot_avg_tensor_values('FA')
+```
+
+### Mean Diffusivity
+
+#### Densities {.tabset}
+
+For Mean Diffusivity, distributions vary more widely across sites. In particular, MIMOSA LESION MD values are quite different for Hopkins data. 
+
+
+```{r}
+vars <-df %>% 
+  select(ends_with('MD')) %>% 
+  colnames()
+dplots <- lapply(vars, plot_densities) %>% 
+  setNames(vars)
+```
+
+```{r, results='asis'}
+for (name in names(dplots)){
+  cat("#####", str_replace_all(name, "_", " "), "\n")
+  print(dplots[[name]])
+  cat("\n\n")
+}
+```
+
+#### Boxplot
+
+As before, medians appear to be different across sites. 
+
+```{r}
+plot_avg_tensor_values('MD')
+```
+
+### Radial Diffusivity
+
+#### Densities {.tabset}
+
+Radial Diffusivity also shows some variations across sites (perhaps less than MD). JLF GM RD in NIH shows multiple peaks, and JLF WM RD shows skewed distributions for all sites. As before the metric for MIMOSA shows a different distribution for Hopkins data. 
+
+```{r}
+vars <-df %>% 
+  select(ends_with('RD')) %>% 
+  colnames()
+dplots <- lapply(vars, plot_densities) %>% 
+  setNames(vars)
+```
+
+```{r, results='asis'}
+for (name in names(dplots)){
+  cat("#####",  str_replace_all(name, "_", " "), "\n")
+  print(dplots[[name]])
+  cat("\n\n")
+}
+```
+
+#### Boxplot
+
+As before, medians appear to be differet across sites. 
+
+```{r}
+plot_avg_tensor_values('RD')
+```
+
+### Axial Diffusivity
+
+#### Densities {.tabset}
+
+For Axial Diffusivity, Hopkins distributions show marked differences across most ROIs compared to other sites. The difference is quite pronounced for MIMOSA.  
+
+```{r}
+vars <-df %>% 
+  select(ends_with('AD')) %>% 
+  colnames()
+dplots <- lapply(vars, plot_densities) %>% 
+  setNames(vars)
+```
+
+```{r, results='asis'}
+for (name in names(dplots)){
+  cat("#####",  str_replace_all(name, "_", " "), "\n")
+  print(dplots[[name]])
+  cat("\n\n")
+}
+```
+
+#### Boxplot
+
+As before, medians show differences, particularly for Hopkins.
+
+```{r}
+plot_avg_tensor_values('AD')
+```
+
+## Permutation Testing of Site Effects
+
+```{r}
+# replace ATROPOS measures with NA for select images (segmentation failed)
+atropos_cols <- df %>% 
+  select(contains('ATROPOS')) %>% 
+  colnames()
+df[(df$subject == '04001' & df$site == 'NIH' & df$scan == '01') |
+   (df$subject == '01003' & df$site == 'NIH' & df$scan == '01') |
+   (df$subject == '03002' & df$site == 'NIH' & df$scan == '02') |
+   (df$subject == '04003' & df$site == 'NIH' & df$scan == '01') |
+   (df$subject == '04001' & df$site == 'BWH' & df$scan == '02') |
+   (df$subject == '03001' & df$site == 'BWH' & df$scan == '01'), atropos_cols] <- NA
+```
+
+```{r, include=FALSE, warning=FALSE}
+# RSQUARE of per subject models: NOT INCLUDED IN FINAL OUTPUT
+get.r.sq = function(df){
+
+ r.sq = numeric(0)
+ for (v in outcomes) { # global outcomes
+   # deal with NAs
+   res = tryCatch(summary(lm(df[,v ] ~ df$site))$r.squared, 
+                  error = function(cond) return(NA))
+   r.sq = c(r.sq, res)
+ }
+ names(r.sq) = outcomes
+ return(r.sq)
+}
+
+# Get r-sq for gadgetron recons
+r_sq_df = df %>%
+  split(df$subject) %>% 
+  lapply(get.r.sq) %>% 
+  bind_rows(.id='subject')
+
+r_sq_df %>% 
+  pivot_longer(cols=outcomes, names_to = "segmentation", values_to = "R.squared") %>% 
+  ggplot(aes(x=segmentation, y=R.squared)) + 
+  geom_boxplot() + 
+  coord_flip() + 
+  ggtitle("R squared values of site effects") + 
+  theme(plot.title = element_text(hjust = 0.5))
+# r_sq_df %>% 
+#   pivot_longer(cols=outcomes, names_to = "segmentation", values_to = "R.squared") %>% 
+#   ggplot(aes(x=segmentation, y=R.squared, color = subject)) + 
+#   geom_boxplot(aes(x=segmentation, y=R.squared, color = NULL)) +
+#   geom_jitter() +
+#   coord_flip() +
+#   ggtitle("R squared values of site effects (Gadgetron)") + theme(plot.title = element_text(hjust = 0.5))
+```
+
+The permutation-based F-test was carried out as previously described. The observed F-statistic for each of the metrics is plotted below as a black dot, while the distribution of permuted test statistics is shown as a white violin plot. All metrics showed significant site effects. 
+
+```{r}
+ratio_stats = readRDS(here::here("results/avg_tensor_by_roi_wide_ratio_stat.rds"))
+null_dist = readRDS(here::here("results/avg_tensor_by_roi_wide_null.rds"))
+```
+
+```{r, warning=FALSE}
+null_dist %>% 
+  pivot_longer(everything()) %>% 
+  ggplot(aes(x=name, y=value)) + 
+  geom_violin(draw_quantiles = c(0.95)) + 
+  geom_point(aes(x=name, y=value), 
+             data = ratio_stats %>% 
+               pivot_longer(everything())) + 
+  coord_flip()
+```
+
+The observed values ("black dots") are represented below in table form along with their unadjusted and adjusted p-values:
+
+```{r}
+test_ratio_stat = function(ratio.stats, null.dists){
+  
+  p.vals = c()
+  for (col in colnames(ratio.stats)){
+    ratio.stat = ratio.stats[, col]
+    null.dist = null.dists[, col]
+    
+    percentile = ecdf(null.dist)
+    p.vals = c(p.vals, percentile(ratio.stat))
+  }
+  names(p.vals) = colnames(ratio.stats)
+  return(p.vals)
+}
+
+p = 1 - test_ratio_stat(ratio_stats, null_dist)
+p_df <- data.frame(p_val = (10000*p + 1)/(1+10000)) 
+
+perm_df <- cbind(
+  ratio_stats %>% 
+    pivot_longer(everything(), names_to = 'outcome', values_to = 'observed_statistic'),
+  p_df %>% 
+    mutate(p_val_fdr = p.adjust(p_val, method = 'fdr'))
+) 
+
+rownames(perm_df) <- NULL
+perm_df
+```
