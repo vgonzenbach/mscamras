@@ -202,6 +202,9 @@ plot_avg_tensor_values <- function(tensor){
     pivot_longer(ends_with(tensor), names_to = 'seg', values_to = 'average') %>% 
     separate(seg, into = c('segmentation', 'roi', 'tensor')) %>% 
     unite(segmentation, segmentation, roi, sep = " ") %>% 
+    mutate(segmentation = factor(segmentation,
+                                 levels = c("ATROPOS GM", "ATROPOS WM", "FAST GM", "FAST WM",
+                                            "JLF GM", "JLF WM", "JLF THALAMUS",  "FIRST THALAMUS", "MIMOSA LESION"))) %>%
     ggplot(aes(x=site, y=average)) + 
     geom_boxplot(outlier.shape = NA) + 
     geom_jitter(aes(color = subject, shape=scan), alpha=0.5) +
@@ -211,10 +214,10 @@ plot_avg_tensor_values <- function(tensor){
     ggtitle(sprintf("Mean %s in ROI by site", tensor)) +
     theme_bw() + 
     # theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust=1)) +
-    scale_x_discrete(expand = c(.00000001, .00000001)) +
     xlab("") + 
     ylab("") + 
-    theme(strip.text.y = element_text(angle = 0))
+    theme(strip.text.y = element_text(angle = 0)) + 
+    scale_x_discrete(expand = c(0.15, 0.15))
 }
 
 plot_avg_tensor_values('FA')
