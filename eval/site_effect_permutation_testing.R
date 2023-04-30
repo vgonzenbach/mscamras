@@ -1,8 +1,11 @@
 suppressMessages(library(dplyr))
 suppressMessages(library(tidyr))
+suppressMessages(library(purrr))
 set.seed(1979)
 
 setwd(rprojroot::find_rstudio_root_file())
+options(error = quote({dump.frames(to.file = TRUE); q(status = 1)}))
+
 
 argv <- commandArgs(trailingOnly = TRUE)
 seg_df = read.csv(argv[1], 
@@ -21,7 +24,7 @@ get_ratio_stat = function(seg_df){
       for (j in 1:nrow(comp_df)) { # iterate over these
         # substract row i from row j, taking absolute value
         diffs = rbind(diffs, 
-                      abs(select(subj_df[i, ], where(is.numeric)) - select(comp_df[j, ], where(is.numeric))))
+                      (select(subj_df[i, ], where(is.numeric)) - select(comp_df[j, ], where(is.numeric)))^2)
       }
       mean_diffs = rbind(mean_diffs, data.frame(t(sapply(diffs, mean, na.rm = TRUE))))
     }
@@ -32,7 +35,7 @@ get_ratio_stat = function(seg_df){
   mean_intrasite_diffs = seg_df %>% 
     split(list(seg_df$subject, seg_df$site)) %>% # split dataset by subject and site, i.e. generate list of data.frames
     lapply(function (x) select(x, where(is.numeric))) %>% # select volumes (in each df)
-    lapply(function (x) sapply(x, function(x) abs(diff(x)))) %>% # take absolute value of row-wise difference in all columns
+    lapply(function (x) sapply(x, function(x) diff(x)^2)) %>% # take absolute value of row-wise difference in all columns
     bind_rows (.id = "subj-site") %>% # put all data.frame elements of the list into a single data.frame
     select(where(is.numeric)) %>% 
     colMeans(na.rm = TRUE) %>% t() %>% data.frame()
@@ -49,16 +52,15 @@ get_ratio_stat = function(seg_df){
 }
 
 permute_ratio_stat = function(seg_df, n.perms = 10000){
-  perm_ratio_stats = list()
     
   seq_len(n.perms) %>% 
     parallel::mclapply(mc.cores = future::availableCores(),
                        function(i){
-                         perm_df = select(seg_df, subject, site, visit) # left side of df
-                         perm_ind = sample(1:nrow(perm_df), nrow(perm_df), replace = FALSE)
-                         perm_df = cbind(perm_df,
-                                         select(seg_df[perm_ind, ], where(is.numeric))) # add right side
-                         get_ratio_stat(perm_df)
+                         seg_df %>% 
+                           split(seg_df$subject) %>% 
+                           map(~ mutate(.x, site = sample(site, nrow(.)))) %>% 
+                           bind_rows() %>%
+                           get_ratio_stat()
                          }) %>% 
     bind_rows()
 }

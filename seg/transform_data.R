@@ -88,3 +88,9 @@ seg_df_wide <- seg_df_wide %>%
 # write
 write.csv(seg_df_wide, 'avg_tensor_by_roi_wide.csv', row.names = FALSE)
 message("Transformed data saved as 'avg_tensor_by_roi_wide.csv'")
+
+seg_df_wide_no_Hopkins <- seg_df_wide %>% 
+  filter(site != 'Hopkins')
+
+write.csv(seg_df_wide_no_Hopkins , 'avg_tensor_by_roi_wide_no_Hopkins.csv', row.names = FALSE)
+message("Filterd Transformed data saved as 'avg_tensor_by_roi_wide_no_Hopkins.csv'")

@@ -14,7 +14,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE, cache=TRUE, rows.print = 15)
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE, cache=FALSE, rows.print = 15)
 ```
 
 ```{r, warning=FALSE}
@@ -95,9 +95,29 @@ $$ p = \frac{10000*p_0 + 1}{10000 + 1}$$
 
 [Source code](https://github.com/vgonzenbach/mscamras/tree/dti) for this project can be found on GitHub.
 
+#### Crossed-design Mixed Linear Models
+
+As an additional test of site effects, mixed models were performed corresponding to a crossed design using the `lmer` function of the `lme4` package. For each outcome variable, two mixed-effects models were fitted: The formula for the base model includes a random intercept for site as well as a random intercept for subject. The formula for the extended model also includes these terms in addition to a fixed effect term for site. 
+
+Base Model:
+
+```
+y ~ (1|subject) + (1|site)
+```
+
+Extended model:
+
+```
+y ~ site + (1|subject) + (1|site)
+```
+
+For each outcome, these two models were compared through a deviance test using the `anova` function in R. P-values for these tests are reported as a test of site effects. 
+
+
 ## Key Findings 
 
 - Permutation tests revealed significant site effects in all 36 outcomes before and after FDR adjustment. 
+- For mixed models, most outcome variables (31 out of 36) show a significant test before and after FDR adjustment indicating the presence of site effects.
 
 ## Questions for follow up  
 
@@ -412,5 +432,169 @@ perm_df <- cbind(
 ) 
 
 rownames(perm_df) <- NULL
-perm_df
+perm_df %>% 
+  arrange(p_val) 
 ```
+There were 31 out 0f 36 significant site effects according to permutation test.
+
+### No Hopkins
+
+Image acquisition at Hopkins was performed with a Philips scanner and distortion correction during on-scanner reconstruction. As the scanner manufacturer and reconstructions method differed than other sites, here we report the permutation results based on the non-Hopkins data only.
+
+```{r}
+ratio_stats = readRDS(here::here("results/avg_tensor_by_roi_wide_no_Hopkins_ratio_stat.rds"))
+null_dist = readRDS(here::here("results/avg_tensor_by_roi_wide_no_Hopkins_null.rds"))
+```
+
+```{r, warning=FALSE}
+null_dist %>% 
+  pivot_longer(everything()) %>% 
+  ggplot(aes(x=name, y=value)) + 
+  geom_violin(draw_quantiles = c(0.95)) + 
+  geom_point(aes(x=name, y=value), 
+             data = ratio_stats %>% 
+               pivot_longer(everything())) + 
+  coord_flip()
+```
+
+The observed values ("black dots") are represented below in table form along with their unadjusted and adjusted p-values:
+
+```{r}
+test_ratio_stat = function(ratio.stats, null.dists){
+  
+  p.vals = c()
+  for (col in colnames(ratio.stats)){
+    ratio.stat = ratio.stats[, col]
+    null.dist = null.dists[, col]
+    
+    percentile = ecdf(null.dist)
+    p.vals = c(p.vals, percentile(ratio.stat))
+  }
+  names(p.vals) = colnames(ratio.stats)
+  return(p.vals)
+}
+
+p = 1 - test_ratio_stat(ratio_stats, null_dist)
+p_df <- data.frame(p_val = (10000*p + 1)/(1+10000)) 
+
+perm_df <- cbind(
+  ratio_stats %>% 
+    pivot_longer(everything(), names_to = 'outcome', values_to = 'observed_statistic'),
+  p_df %>% 
+    mutate(p_val_fdr = p.adjust(p_val, method = 'fdr'))
+) 
+
+rownames(perm_df) <- NULL
+perm_df %>% 
+  arrange(p_val) 
+```
+
+Excluding the Hopkins data, 13 (instead of 31) out of 36 outcome variables show significant site effects. 
+
+
+## Mixed-Effect Models
+
+Two mixed models (a base and an extended model) were performed as described above. The p-values for the model comparison are arranged in increasing order below.
+
+```{r}
+models <- outcomes %>% 
+  lapply(function(x) lmer(reformulate("site + (1|subject) + (1|site)", x), data=df)) %>% 
+  setNames(outcomes)
+```
+
+```{r}
+models_0 <- outcomes %>% 
+  lapply(function(x) lmer(reformulate("(1|subject) + (1|site)", x), data=df)) %>% 
+  setNames(outcomes)
+```
+
+```{r}
+anovas <- purrr::map2(models, models_0, ~ anova(.x, .y)) # deviance test between the two models
+# pull p.values from all tests
+p_vals <- anovas %>% 
+  purrr::map(~ broom::tidy(.x) %>%
+               pull(p.value) %>% 
+               na.omit()) %>% 
+  purrr::reduce(c)
+anova_test_df <- data.frame(outcome = names(anovas), p_val = p_vals) %>% 
+  arrange(p_val) %>% 
+  mutate(p_val_fdr = p.adjust(p_val, method = 'fdr'))
+anova_test_df
+```
+
+After FDR-adjustment, 13 of the 36 variables show site effects according to the mixed models. 
+
+```{r, include=FALSE}
+icc_df <- models %>% 
+  lapply(performance::icc, by_group = TRUE) %>% 
+  bind_rows(.id = "outcome") %>% 
+  as.data.frame()
+icc_df %>% 
+  filter(Group == 'subject') %>% 
+  ggplot(aes(x=outcome, y=ICC)) + 
+  geom_col() + 
+  coord_flip() + 
+  ggtitle("ICC of Subject Random Effect") + 
+  ylim(0,1)
+```
+
+```{r, include=FALSE}
+icc_df %>% 
+  filter(Group == 'site') %>% 
+  ggplot(aes(x=outcome, y=ICC)) + 
+  geom_col() + 
+  coord_flip() + 
+  ggtitle("ICC of Site Random Effect") + 
+  ylim(0,1)
+```
+
+```{r, eval=FALSE, include=FALSE}
+## CHUNK NOT INCLUDED
+plot_resid <- function(model){
+  car::qqPlot(residuals(model),dist="norm", main="Residuals")
+}
+
+#resids <- purrr::map(models, plot_resid) %>% setNames(names(models))
+```
+
+```{r, results='asis', eval=FALSE, include=FALSE}
+## CHUNK NOT INCLUDED
+for (name in names(models)){
+  cat("####",  str_replace_all(name, "_", " "), "\n")
+  print(plot_resid(models[[name]]))
+  cat("\n\n")
+}
+```
+
+### No Hopkins
+
+Here, we report results from the mixed models carried out only on the non-Hopkins data.
+
+```{r}
+models <- outcomes %>% 
+  lapply(function(x) lmer(reformulate("site + (1|subject) + (1|site)", x), data=filter(df, site != 'Hopkins'))) %>% 
+  setNames(outcomes)
+```
+
+```{r}
+models_0 <- outcomes %>% 
+  lapply(function(x) lmer(reformulate("(1|subject) + (1|site)", x), data=filter(df, site != 'Hopkins'))) %>% 
+  setNames(outcomes)
+```
+
+```{r}
+anovas <- purrr::map2(models, models_0, ~ anova(.x, .y)) # deviance test between the two models
+# pull p.values from all tests
+p_vals <- anovas %>% 
+  purrr::map(~ broom::tidy(.x) %>%
+               pull(p.value) %>% 
+               na.omit()) %>% 
+  purrr::reduce(c)
+anova_test_df <- data.frame(outcome = names(anovas), p_val = p_vals) %>% 
+  arrange(p_val) %>% 
+  mutate(p_val_fdr = p.adjust(p_val, method = 'fdr'))
+anova_test_df
+```
+
+The table shows that none of the outcome variables showed significant site effects when excluding the Hopkins data.
+

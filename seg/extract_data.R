@@ -15,22 +15,22 @@ get_tensor_type <- function(path) stringr::str_extract(path, '(FA|MD|RD|AD).nii.
 get_seg_path <- function(dwi_path, seg_type){ # TODO: create the inverse function (rather add feature to make an inverse)
     sub <- get_subject(dwi_path)
     if (seg_type == 'atropos'){
-        suffix <- 'dseg.nii.gz'
+        suffix <- 'desc-sanslesion_dseg.nii.gz'
 
     } else if (seg_type == 'first'){
         suffix <- '_all_none_firstseg.nii.gz'
 
     } else if (seg_type == 'fast'){
-        suffix <- '_seg.nii.gz'
+        suffix <- 'desc-sanslesion_T1w_seg.nii.gz'
 
     } else if (seg_type == 'jlfseg_WMGM'){
-        suffix <- 'dseg.nii.gz'
+        suffix <- 'desc-sanslesion_space-T1w_dseg.nii.gz'
 
     } else if (seg_type == 'jlfseg_thal'){
         suffix <- 'dseg.nii.gz'
 
     } else if (seg_type == 'mimosa'){
-        suffix <- 'mask.nii.gz'
+        suffix <- 'n4regmasked_label-lesion_mask.nii.gz'
     }
     cmd <- sprintf('find data/v5/derivatives/%s -name %s*%s', seg_type, sub, suffix)
     system(cmd, intern=TRUE)
