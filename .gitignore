@@ -2,6 +2,7 @@
 .Rhistory
 .RData
 .Ruserdata
+.Rprofile
 logs/
 tmp/
 old/
@@ -15,4 +16,6 @@ dti/qa/
 .venv/
 docs/*_files
 notebooks/*_files
+notebooks/*_cache
 .vscode/
+renv/
