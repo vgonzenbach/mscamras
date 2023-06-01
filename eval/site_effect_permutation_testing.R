@@ -17,7 +17,7 @@ get_ratio_stat = function(seg_df){
     #' Calculates mean inter-site difference for a "subjects" data.frame
     
     mean_diffs = data.frame()
-    for (i in 1:nrow(subj_df)){ # iterate over rows 
+    for (i in seq_len(nrow(subj_df))){ # iterate over rows 
       diffs = data.frame()
       ref_site = subj_df[i, "site"] # save site of current row as reference site
       comp_df = subj_df %>% filter(site != ref_site) # select rows from other sites
@@ -38,17 +38,18 @@ get_ratio_stat = function(seg_df){
     lapply(function (x) sapply(x, function(x) diff(x)^2)) %>% # take absolute value of row-wise difference in all columns
     bind_rows (.id = "subj-site") %>% # put all data.frame elements of the list into a single data.frame
     select(where(is.numeric)) %>% 
-    colMeans(na.rm = TRUE) %>% t() %>% data.frame()
+    colMeans(na.rm = TRUE)
   
   # get intersite differences
   mean_intersite_diffs = seg_df %>% 
     split (seg_df$subject) %>% 
     lapply(get_mean_intersite_diff) %>% 
     bind_rows() %>% 
-    colMeans(na.rm = TRUE) %>% t() %>% data.frame()
+    colMeans(na.rm = TRUE)
   
-  diff_ratio = mean_intersite_diffs / mean_intrasite_diffs
-  return(diff_ratio)
+  F = mean_intersite_diffs / mean_intrasite_diffs
+  res_df = data.frame(F = F, MS_B = mean_intersite_diffs, MS_W = mean_intrasite_diffs)
+  return(res_df)
 }
 
 permute_ratio_stat = function(seg_df, n.perms = 10000){
@@ -58,14 +59,17 @@ permute_ratio_stat = function(seg_df, n.perms = 10000){
                        function(i){
                          seg_df %>% 
                            split(seg_df$subject) %>% 
-                           map(~ mutate(.x, site = sample(site, nrow(.)))) %>% 
+                           map(~ mutate(.x, site = sample(site, nrow(.x)))) %>% 
                            bind_rows() %>%
                            get_ratio_stat()
                          }) %>% 
-    bind_rows()
+    map(tibble::rownames_to_column) %>% 
+    bind_rows() %>% 
+    group_by(rowname) %>% 
+     summarize_all(.funs = ~ list(.))
 }
 
-ratio.stat = cbind(seg_df %>%
+ratio.stat = rbind(seg_df %>%
                  select(!is.numeric, starts_with('ATROPOS')) %>% 
                  unite(sub, subject, site, visit, sep = '-') %>% 
                  filter(!sub %in% c('04001-NIH-01', '01003-NIH-01', '03002-NIH-02', '04003-NIH-01', '04001-BWH-02', '03001-BWH-01')) %>% 
@@ -76,7 +80,7 @@ ratio.stat = cbind(seg_df %>%
                  get_ratio_stat()
                )
 
-null.dists = cbind(seg_df %>%
+null.dists = rbind(seg_df %>%
                  select(-starts_with('ATROPOS')) %>% 
                  permute_ratio_stat(),
                seg_df %>%
