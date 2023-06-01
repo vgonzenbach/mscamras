@@ -11,21 +11,28 @@ options(error = quote({dump.frames(to.file = TRUE); q(status = 1)}))
 
 get_icc <- function(df){
   
-  outcomes <- df %>% 
-                dplyr::select_if(is.numeric) %>% 
-                colnames()
+    tryCatch({
+      outcomes <- df %>% 
+              dplyr::select_if(is.numeric) %>% 
+              colnames()
+      result <- outcomes %>% 
+        map(~lmer(reformulate("(1|subject) + (1|site)", .x), data=df)) %>% 
+        purrr::map(~ performance::icc(.x, by_group = TRUE) %>% as.data.frame) %>% 
+        setNames(outcomes) %>% 
+        bind_rows(.id = "outcome") %>% 
+        select_if(~ !all(is.na(.))) %>% # eliminate column of NAs
+        na.omit() %>% # eliminate rows with NA
+        pivot_wider(names_from = 'Group', values_from = 'ICC', names_prefix = 'ICC_') %>% 
+        relocate(ICC_site, .after = 'outcome') %>%
+        arrange(desc(ICC_site))
+    return(result)
+  }, error = function(e) {
+    # Task failed, return NA
+    return(NA)
+  })
 
-  outcomes %>% 
-    map(~lmer(reformulate("(1|subject) + (1|site)", .x), data=df)) %>% 
-    purrr::map(~ performance::icc(.x, by_group = TRUE) %>% as.data.frame) %>% 
-    setNames(outcomes) %>% 
-    bind_rows(.id = "outcome") %>% 
-    select_if(~ !all(is.na(.))) %>% # eliminate column of NAs
-    na.omit() %>% # eliminate rows with NA
-    pivot_wider(names_from = 'Group', values_from = 'ICC', names_prefix = 'ICC_') %>% 
-    relocate(ICC_site, .after = 'outcome') %>%
-    arrange(desc(ICC_site))
 }
+  
 
 boot_icc <- function(df, n.iter = 5000){
   
@@ -40,6 +47,8 @@ boot_icc <- function(df, n.iter = 5000){
                          map_dfr(~filter(df, subject %in% .x)) %>%
                          get_icc(),
                        mc.cores = future::availableCores()) %>% 
+    # exclude calls that return NA
+    subset(!is.na(.)) %>% 
     bind_rows() %>% 
     # create list columns to get 2.5 and 97.5 percentiles
     group_by(outcome) %>%
@@ -62,15 +71,15 @@ argv <- commandArgs(trailingOnly = TRUE)
 df <- read.csv(argv[1],
               colClasses = c("subject" = "character", "visit" = "character"))
 # get variable names (for get_icc to work)
-boot_df <- rbind(
-  df %>% 
-    filter_failed_atropos() %>% 
-    select(!is.numeric, starts_with('ATROPOS')) %>% 
-    boot_icc(),
-  df %>% 
-    select(-starts_with('ATROPOS')) %>% 
-    boot_icc()
-)
+
+atropos_df <- df %>% 
+    select(!where(is.numeric), starts_with('ATROPOS')) %>% 
+    filter_failed_atropos()
+nonatropos_df <-  df %>% 
+    select(-starts_with('ATROPOS'))
+
+boot_df <- rbind(boot_icc(atropos_df),
+                boot_icc(nonatropos_df))
 
 saveRDS(boot_df, sprintf("results/%s_boot_icc.rds", tools::file_path_sans_ext(basename(argv[1]))))
 message("Results saved")
