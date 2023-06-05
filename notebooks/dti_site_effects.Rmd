@@ -5,8 +5,8 @@ date: "`r Sys.Date()`"
 output: 
   html_document:
     theme: united
-    toc: True
-    toc_float: True
+    toc: true
+    toc_float: true
     code_folding: hide
     df_print: paged
     fig_width: 10
@@ -14,16 +14,12 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE, cache=FALSE, rows.print = 15)
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE, cache=TRUE, cache.path = here::here('notebooks/cache/dti_site_effects/'), rows.print = 15)
 ```
 
 ```{r, warning=FALSE}
-library(dplyr)
-library(tidyr)
-library(ggplot2)
-library(stringr)
+library(tidyverse)
 library(lme4)
-library(rstatix)
 
 options(scipen=999)
 df = read.csv(here::here('avg_tensor_by_roi_wide.csv'),
@@ -38,7 +34,7 @@ outcomes = df %>%
 
 ## Summary 
 
-The purpose of the DTIMSCAMRAS study is to test for site effects on DTI metrics of different brain regions in the context of a traveling subjects design with a harmonized imaging protocol. Participants (n=11) with stable Multiple Sclerosis (MS) were scanned in 4 different locations: National Institute of Health (NIH), Brigham and Women's Hospital (BWH), Johns Hopkins University (Hopkins), and The University of Pennsylvania (Penn). Two scans were collected per site visit, and participants were re-positioned between scans. Penn, BWH and NIH used Siemens scanners, while Hopkins used a Phillips scanner. The modalities that were collected include T1s (MPRAGE), FLAIR, and Diffusion-weighted images (DWI). 
+The purpose of the DTIMSCAMRAS study is to test for site effects on DTI metrics of different brain regions in the context of a traveling subjects design with a harmonized imaging protocol. Participants (n=11) with stable Multiple Sclerosis (MS) were scanned in 4 different locations: National Institute of Health (NIH), Brigham and Women's Hospital (BWH), Johns Hopkins University (Hopkins), and The University of Pennsylvania (Penn). Two scans were collected per site visit, and participants were re-positioned between scans. Penn, BWH and NIH used Siemens scanners, while Hopkins used a Phillips scanner. The imaging modalities that were collected include T1s (MPRAGE), FLAIR, and Diffusion-weighted images (DWI). 
 
 ### Preprocessing
 
@@ -61,7 +57,7 @@ Concurrently, several segmentation pipelines were used on the T1s (+ FLAIRs in t
 * Lesion Segmentation methods:
   + MIMOSA
   
-The segmentation results were used to average the scalar maps across all voxels belonging to each of the ROIs. The 36 resulting metrics make up the set of outcome variables which are the focus of the site effects test. Below, the outcome variables are listed. 
+To remove lesions appearing in GM or WM (or thalamus) from the calculation, mimosa masks were inverted and applied to the segmentation label maps in order to zero out the tissue masks at the location of each lesion. These adjusted segmentation results were then used to average the DTI scalar maps across all voxels belonging to each of the ROIs. The 36 resulting DTI metrics make up the set of outcome variables which are the focus of the site effects test. Below, the outcome variables are listed. 
 
 ```{r}
 data.frame(OUTCOME = outcomes) %>% 
@@ -72,9 +68,13 @@ Note the general <SEGMENTATION>_<ROI>_<SCALAR> format: for example, the ATROPOS_
 
 ### Testing site effects
 
+Testing for site effects was performed using two approaches: a permutation-based approach and a deviance test of mixed models.  
+
+Additionally, as Hopkins data was acquired using a Philips scanner, which is in contrast to all other sites, the two testing approaches were performed again while excluding Hopkins data.
+
 #### Permutation-Based F-test
 
-A permutation-based F-test was used to test for site effects. For each subject, the absolute difference between all possible pairs of intra-site and inter-site measures were computed. For instance, take the first row of the subject data.frame below, which has BWH as the "reference site": the absolute differences between that row and the 6 non-BWH rows are computed for $y$——this process is repeated for all rows (and the results averaged) to arrive to the average inter-site difference for this subject; for the average intra-site differences the absolute difference of the 4 intrasite pairs are averaged.
+A permutation-based F-test was used to test for site effects. For each subject, the squared difference between all possible pairs of intra-site and inter-site measures were computed. For instance, take the first row of the subject data.frame below, which has BWH as the "reference site": the squared differences between that row and the 6 non-BWH rows are computed for $y$——this process is repeated for all rows (and the results averaged) to arrive to the mean inter-site squared difference for this subject; to calculate the mean intra-site squared differences, the squared differences of the 4 intrasite pairs are averaged.
 
 ```{r}
 df %>% 
@@ -83,17 +83,15 @@ df %>%
   rename(y = ATROPOS_GM_AD)
 ```
 
-These differences were averaged across all subjects resulting in the Mean Absolute Difference Between Sites ($\overline{MAD_{B}}$) and the Mean Absolute Difference Within Sites ($\overline{MAD_{W}}$). The test statistic is composed of their ratio:
+These differences were averaged across all subjects resulting in the Mean Squared difference Between Sites ($\overline{MS_{B}}$) and the Mean Squared difference Within Sites ($\overline{MS_{W}}$). The test statistic is composed of their ratio:
 
 $$
-F = \frac{\overline{MAD_{B}}}{\overline{MAD_{W}}}
+F = \frac{\overline{MS_{B}}}{\overline{MS_{W}}}
 $$
 
-For each metric, the observed test statistic was compared to a distribution of test statistics derived from 10000 permutations (i.e. a null distribution). The proportion of null results higher than the observed test statistic served as a preliminary p-value $p_0$. To prevent p-values of 0 (when the observed statistic was higher than all permuted results), the p-value was shifted using the following formula:
+For each metric, the observed test statistic was compared to a distribution of test statistics derived from 10000 permutations (i.e. a null distribution). The site labels were permuted **within each subject**. The proportion of null results higher than the observed test statistic served as a preliminary p-value $p_0$. To prevent p-values of 0 (when the observed statistic was higher than all permuted results), the p-value was shifted using the following formula:
 
 $$ p = \frac{10000*p_0 + 1}{10000 + 1}$$
-
-[Source code](https://github.com/vgonzenbach/mscamras/tree/dti) for this project can be found on GitHub.
 
 #### Crossed-design Mixed Linear Models
 
@@ -113,16 +111,15 @@ y ~ site + (1|subject) + (1|site)
 
 For each outcome, these two models were compared through a deviance test using the `anova` function in R. P-values for these tests are reported as a test of site effects. 
 
+[Source code](https://github.com/vgonzenbach/mscamras/tree/dti) for this project can be found on GitHub.
 
 ## Key Findings 
 
-- Permutation tests revealed significant site effects in all 36 outcomes before and after FDR adjustment. 
-- For mixed models, most outcome variables (31 out of 36) show a significant test before and after FDR adjustment indicating the presence of site effects.
+- Permutation tests revealed significant site effects in 31 out of 36 outcomes after FDR adjustment when all data is included. After excluding Hopkins data, the number of significant site effects decreased to 13. Most of the DTI metrics (i.e. outcomes) that showed differences were derived from thalamus segmentation results. 
+- For mixed models, most outcome variables (13 out of 36) show a significant test after FDR adjustment indicating the presence of site effects when all data is included. When Hopkins data is excluded, none of the outcome variables show site effects. 
 
 ## Questions for follow up  
 
-- The data included in this report was non-distortion corrected data for Penn, NIH and BWH; while Hopkins data was all distortion corrected. Should the analysis be redone for non-Hopkins data? Note: DTI data was only collected **without** distortion correction in non-Hopkins sites. 
-- Manual lesion segmentations are not included in this report. Should these be included in this assessment?
 - It is unclear to what extent potential segmentation differences across sites might contribute to site effects, i.e. to what extent do site differences stem from ROI coverage differences (due to scanner effects on the T1s), and to what extent are the differences due to scanner effects on DWI images? 
 
 ## Data Inventory
@@ -334,7 +331,7 @@ As before, medians show differences, particularly for Hopkins.
 plot_avg_tensor_values('AD')
 ```
 
-## Permutation Testing of Site Effects
+## Permutation Testing of Site Effects 
 
 ```{r}
 # replace ATROPOS measures with NA for select images (segmentation failed)
@@ -349,95 +346,103 @@ df[(df$subject == '04001' & df$site == 'NIH' & df$scan == '01') |
    (df$subject == '03001' & df$site == 'BWH' & df$scan == '01'), atropos_cols] <- NA
 ```
 
-```{r, include=FALSE, warning=FALSE}
-# RSQUARE of per subject models: NOT INCLUDED IN FINAL OUTPUT
-get.r.sq = function(df){
-
- r.sq = numeric(0)
- for (v in outcomes) { # global outcomes
-   # deal with NAs
-   res = tryCatch(summary(lm(df[,v ] ~ df$site))$r.squared, 
-                  error = function(cond) return(NA))
-   r.sq = c(r.sq, res)
- }
- names(r.sq) = outcomes
- return(r.sq)
-}
-
-# Get r-sq for gadgetron recons
-r_sq_df = df %>%
-  split(df$subject) %>% 
-  lapply(get.r.sq) %>% 
-  bind_rows(.id='subject')
-
-r_sq_df %>% 
-  pivot_longer(cols=outcomes, names_to = "segmentation", values_to = "R.squared") %>% 
-  ggplot(aes(x=segmentation, y=R.squared)) + 
-  geom_boxplot() + 
-  coord_flip() + 
-  ggtitle("R squared values of site effects") + 
-  theme(plot.title = element_text(hjust = 0.5))
-# r_sq_df %>% 
-#   pivot_longer(cols=outcomes, names_to = "segmentation", values_to = "R.squared") %>% 
-#   ggplot(aes(x=segmentation, y=R.squared, color = subject)) + 
-#   geom_boxplot(aes(x=segmentation, y=R.squared, color = NULL)) +
-#   geom_jitter() +
-#   coord_flip() +
-#   ggtitle("R squared values of site effects (Gadgetron)") + theme(plot.title = element_text(hjust = 0.5))
-```
-
 The permutation-based F-test was carried out as previously described. The observed F-statistic for each of the metrics is plotted below as a black dot, while the distribution of permuted test statistics is shown as a white violin plot. All metrics showed significant site effects. 
 
-```{r}
+```{r, cache=FALSE}
 ratio_stats = readRDS(here::here("results/avg_tensor_by_roi_wide_ratio_stat.rds"))
 null_dist = readRDS(here::here("results/avg_tensor_by_roi_wide_null.rds"))
 ```
 
+### F Distributions {.tabset}
+
+#### Plot
+
 ```{r, warning=FALSE}
 null_dist %>% 
-  pivot_longer(everything()) %>% 
-  ggplot(aes(x=name, y=value)) + 
+  select(rowname, F) %>% 
+  unnest() %>% 
+  ggplot(aes(x=rowname, y=F)) + 
   geom_violin(draw_quantiles = c(0.95)) + 
-  geom_point(aes(x=name, y=value), 
-             data = ratio_stats %>% 
-               pivot_longer(everything())) + 
-  coord_flip()
+  coord_flip() + 
+  geom_point(aes(x=rowname, y=F), 
+             data=tibble::rownames_to_column(ratio_stats)) 
 ```
 
-The observed values ("black dots") are represented below in table form along with their unadjusted and adjusted p-values:
+#### Data
+
+```{r}
+ratio_stats %>% 
+  arrange(desc(F))
+```
+
+
+### p-values {.tabset}
 
 ```{r}
 test_ratio_stat = function(ratio.stats, null.dists){
   
   p.vals = c()
   for (col in colnames(ratio.stats)){
-    ratio.stat = ratio.stats[, col]
-    null.dist = null.dists[, col]
+    ratio.stat = pull(ratio.stats, col)
+    null.dist = pull(null.dists, col)
     
     percentile = ecdf(null.dist)
-    p.vals = c(p.vals, percentile(ratio.stat))
+    p.val <- (10000* (1 - percentile(ratio.stat)) + 1)/(1+10000)
+    p.vals = c(p.vals, p.val)
   }
   names(p.vals) = colnames(ratio.stats)
   return(p.vals)
 }
 
-p = 1 - test_ratio_stat(ratio_stats, null_dist)
-p_df <- data.frame(p_val = (10000*p + 1)/(1+10000)) 
+observed_F <- ratio_stats %>% 
+  tibble::rownames_to_column() %>%
+  select(rowname, F) %>% 
+  pivot_wider(names_from = 'rowname', values_from = 'F')
+
+
+null_Fs <- null_dist %>% 
+  select(rowname, F) %>% 
+  unnest() %>% 
+  pivot_wider(names_from = 'rowname', values_from = 'F') %>% 
+  unnest() %>% 
+  select(!!!colnames(observed_F)) # re-order columns to match observed
+
+p_df <- data.frame(p_val = test_ratio_stat(observed_F, null_Fs))
 
 perm_df <- cbind(
   ratio_stats %>% 
-    pivot_longer(everything(), names_to = 'outcome', values_to = 'observed_statistic'),
+    select(F),
   p_df %>% 
-    mutate(p_val_fdr = p.adjust(p_val, method = 'fdr'))
-) 
+    mutate(pval_fdr = p.adjust(p_val, method = 'fdr'))
+)
 
-rownames(perm_df) <- NULL
-perm_df %>% 
-  arrange(p_val) 
+
 ```
-There were 31 out 0f 36 significant site effects according to permutation test.
 
-### No Hopkins
+#### Plot 
+
+```{r}
+perm_df %>% 
+  tibble::rownames_to_column('outcome') %>% 
+  mutate(outcome = fct_reorder(outcome, pval_fdr, .desc = TRUE)) %>% 
+  ggplot(aes(x=outcome, y=pval_fdr)) + 
+  geom_point(size = 2) +
+  geom_hline(yintercept = 0.05, color = 'red') + 
+  coord_flip() + 
+  ggtitle("P-values of Permutation Test") +
+  ylim(0,1)
+```
+
+#### Data
+
+```{r}
+perm_df %>% 
+  arrange(desc(p_val))
+```
+
+There were 35 out of 36 significant site effects according to permutation test.
+
+## Permutation Testing (No Hopkins)
 
 Image acquisition at Hopkins was performed with a Philips scanner and distortion correction during on-scanner reconstruction. As the scanner manufacturer and reconstructions method differed than other sites, here we report the permutation results based on the non-Hopkins data only.
 
@@ -446,155 +451,371 @@ ratio_stats = readRDS(here::here("results/avg_tensor_by_roi_wide_no_Hopkins_rati
 null_dist = readRDS(here::here("results/avg_tensor_by_roi_wide_no_Hopkins_null.rds"))
 ```
 
+### F Distributions {.tabset}
+
+#### Plot
+
 ```{r, warning=FALSE}
 null_dist %>% 
-  pivot_longer(everything()) %>% 
-  ggplot(aes(x=name, y=value)) + 
+  unnest() %>% 
+  ggplot(aes(x=rowname, y=F)) + 
   geom_violin(draw_quantiles = c(0.95)) + 
-  geom_point(aes(x=name, y=value), 
-             data = ratio_stats %>% 
-               pivot_longer(everything())) + 
-  coord_flip()
+  coord_flip() + 
+  geom_point(aes(x=rowname, y=F), 
+             data=tibble::rownames_to_column(ratio_stats)) 
+```
+
+#### Data
+
+```{r}
+ratio_stats %>% 
+  arrange(desc(F))
 ```
 
 The observed values ("black dots") are represented below in table form along with their unadjusted and adjusted p-values:
 
 ```{r}
-test_ratio_stat = function(ratio.stats, null.dists){
-  
-  p.vals = c()
-  for (col in colnames(ratio.stats)){
-    ratio.stat = ratio.stats[, col]
-    null.dist = null.dists[, col]
-    
-    percentile = ecdf(null.dist)
-    p.vals = c(p.vals, percentile(ratio.stat))
-  }
-  names(p.vals) = colnames(ratio.stats)
-  return(p.vals)
-}
+observed_F <- ratio_stats %>% 
+  tibble::rownames_to_column() %>%
+  select(rowname, F) %>% 
+  pivot_wider(names_from = 'rowname', values_from = 'F')
 
-p = 1 - test_ratio_stat(ratio_stats, null_dist)
-p_df <- data.frame(p_val = (10000*p + 1)/(1+10000)) 
+
+null_Fs <- null_dist %>% 
+  select(rowname, F) %>% 
+  unnest() %>% 
+  pivot_wider(names_from = 'rowname', values_from = 'F') %>% 
+  unnest() %>% 
+  select(!!!colnames(observed_F)) # re-order columns to match observed
+
+p_df <- data.frame(p_val= test_ratio_stat(observed_F, null_Fs))
 
 perm_df <- cbind(
   ratio_stats %>% 
-    pivot_longer(everything(), names_to = 'outcome', values_to = 'observed_statistic'),
+    select(F),
   p_df %>% 
-    mutate(p_val_fdr = p.adjust(p_val, method = 'fdr'))
-) 
+    mutate(pval_fdr = p.adjust(p_val, method = 'fdr'))
+)
+```
 
-rownames(perm_df) <- NULL
+### p-values {.tabset}
+
+The plot below shows that the permutation test revealed `r perm_df |> filter(pval_fdr < 0.05) |> nrow()` significant site effects across the 36 outcomes. 
+
+#### Plot 
+
+```{r}
 perm_df %>% 
-  arrange(p_val) 
-```
-
-Excluding the Hopkins data, 13 (instead of 31) out of 36 outcome variables show significant site effects. 
-
-
-## Mixed-Effect Models
-
-Two mixed models (a base and an extended model) were performed as described above. The p-values for the model comparison are arranged in increasing order below.
-
-```{r}
-models <- outcomes %>% 
-  lapply(function(x) lmer(reformulate("site + (1|subject) + (1|site)", x), data=df)) %>% 
-  setNames(outcomes)
-```
-
-```{r}
-models_0 <- outcomes %>% 
-  lapply(function(x) lmer(reformulate("(1|subject) + (1|site)", x), data=df)) %>% 
-  setNames(outcomes)
-```
-
-```{r}
-anovas <- purrr::map2(models, models_0, ~ anova(.x, .y)) # deviance test between the two models
-# pull p.values from all tests
-p_vals <- anovas %>% 
-  purrr::map(~ broom::tidy(.x) %>%
-               pull(p.value) %>% 
-               na.omit()) %>% 
-  purrr::reduce(c)
-anova_test_df <- data.frame(outcome = names(anovas), p_val = p_vals) %>% 
-  arrange(p_val) %>% 
-  mutate(p_val_fdr = p.adjust(p_val, method = 'fdr'))
-anova_test_df
-```
-
-After FDR-adjustment, 13 of the 36 variables show site effects according to the mixed models. 
-
-```{r, include=FALSE}
-icc_df <- models %>% 
-  lapply(performance::icc, by_group = TRUE) %>% 
-  bind_rows(.id = "outcome") %>% 
-  as.data.frame()
-icc_df %>% 
-  filter(Group == 'subject') %>% 
-  ggplot(aes(x=outcome, y=ICC)) + 
-  geom_col() + 
+  tibble::rownames_to_column('outcome') %>% 
+  mutate(outcome = fct_reorder(outcome, pval_fdr, .desc = TRUE)) %>% 
+  ggplot(aes(x=outcome, y=pval_fdr)) + 
+  geom_point(size = 2) +
+  geom_hline(yintercept = 0.05, color = 'red') + 
   coord_flip() + 
-  ggtitle("ICC of Subject Random Effect") + 
+  ggtitle("P-values of Permutation Test") +
   ylim(0,1)
 ```
 
-```{r, include=FALSE}
+#### Data
+
+```{r}
+perm_df %>% 
+  arrange(desc(p_val))
+```
+
+
+## Mixed Models
+
+For each of the 36 outcome variables, two mixed models (a base and an extended model) were fit and the extended model of interest was compared against the null/base model using a likelihood ratio test. The resulting p-values are reported. ICCs based on the extented model are also reported. 
+
+Of note, two of the models estimated a 0 variance for the site random effect. P-values and ICCs are not provided for these two models.
+
+```{r}
+# Full models
+models <- outcomes %>% 
+  lapply(function(x) lmer(reformulate("(1|subject) + (1|site)", x), data=df)) %>% 
+  setNames(outcomes)
+
+# Null models
+models_0 <- outcomes %>% 
+  lapply(function(x) lmer(reformulate("(1|subject)", x), data=df)) %>% 
+  setNames(outcomes)
+
+#' Test variance term
+#' @param mod full model
+#' @param mod_0 null model
+test_variance_term <- function(mod, mod_0){
+  
+  A = lme4:::anova.merMod(mod, mod_0)
+  lrt_stat = as.numeric(-2*(logLik(mod_0) - logLik(mod)))
+  
+  #if(near(lrt_stat, A$Chisq[2])) return(NA)
+  
+  # Naive p-value given the chi_sq(df = 1) null distribution
+  pval_naive = pchisq(q = lrt_stat, df = 1, lower.tail = FALSE) 
+  
+  # p-value given a 50:50 mixture of chisq(1) and point mass at 1: P[χ21 ≥ Tobs]/2,
+  # according to Self & Liang 1987
+  pval_SL = pchisq(q = lrt_stat, df = 1, lower.tail = FALSE)/2
+  
+  return(data.frame(pval_naive = pval_naive,
+                    pval_SL = pval_SL))
+}
+
+# Which random effect variance is 0 
+get_zero_var_model_names <- function(models){
+  get_var <- function(model) summary(model)$varcor$site[1,1]
+  
+  zero_var_models <- models %>% 
+    purrr::map_dbl(get_var) %>% 
+    as.data.frame() %>% 
+    setNames('variance') %>% 
+    rownames_to_column(var = 'outcome') %>% 
+    filter(near(variance, 0, .Machine$double.eps)) %>% 
+    pull(outcome)
+  return(zero_var_models)
+}
+
+zero_var_model_names <- get_zero_var_model_names(models)
+```
+
+<details>
+  <summary>See models with 0 variance</summary>
+  
+```{r}
+for (name in zero_var_model_names){
+  cat('###', name, '\n\n')
+  print(summary(models[[name]]))
+  cat("\n\n")
+}
+```
+  
+</details>
+
+### p-values {.tabset}
+
+```{r}
+p_df <- purrr::map2(models, models_0, test_variance_term) %>% 
+  setNames(outcomes) %>% 
+  bind_rows(.id = 'outcome') %>% 
+    filter(!(outcome %in% zero_var_model_names)) %>% 
+  select(-pval_naive) %>% 
+  rename(pval = pval_SL) %>% 
+  mutate(pval_fdr = p.adjust(pval, method = 'fdr')) %>% 
+  arrange(pval)
+```
+
+#### Plot
+
+
+```{r}
+p_df %>% 
+  mutate(outcome = fct_reorder(outcome, pval_fdr, .desc = TRUE)) %>% 
+  ggplot(aes(x=outcome, y=pval_fdr)) + 
+  geom_point(size = 2) +
+  geom_hline(yintercept = 0.05, color = 'red') + 
+  coord_flip() + 
+  ggtitle("P-values of Likelihood Ratio Test (Self & Liang 1987)") +
+  ylim(0,1)
+```
+
+#### Data
+
+```{r}
+options(scipen = 999)
+p_df
+```
+
+### ICC {.tabset}
+
+ICC for the 35 remaining models is shown
+
+```{r}
+boot_df <- readRDS(here::here('results/avg_tensor_by_roi_wide_boot_icc.rds'))
+```
+
+
+```{r}
+options(scipen=999)
+#' Get ICC for a single model
+get_icc <- function(df){
+
+  outcomes %>% 
+    map(~lmer(reformulate("(1|subject) + (1|site)", .x), data=df)) %>% 
+    purrr::map(~ performance::icc(.x, by_group = TRUE) %>% as.data.frame) %>% 
+    setNames(outcomes) %>% 
+    bind_rows(.id = "outcome") %>% 
+    select_if(~ !all(is.na(.))) %>% # eliminate column of NAs
+    na.omit() %>% # eliminate rows with NA
+    pivot_wider(names_from = 'Group', values_from = 'ICC', names_prefix = 'ICC_') %>% 
+    relocate(ICC_site, .after = 'outcome') %>%
+    arrange(desc(ICC_site))
+}
+
+outcomes
+# extract observed icc_df
+icc_df <- get_icc(df)
+icc_df
+```
+
+
+#### Site
+
+```{r}
+## Make violin plots
+## AND make line
 icc_df %>% 
-  filter(Group == 'site') %>% 
-  ggplot(aes(x=outcome, y=ICC)) + 
-  geom_col() + 
+  left_join(boot_df %>% 
+              select(-ICC_site, -ICC_subject), by = 'outcome') %>% 
+  mutate(outcome = fct_reorder(outcome, ICC_site)) %>% 
+  ggplot(aes(x=outcome, y=ICC_site)) + 
+  geom_errorbar(aes(ymin=lwr_site, ymax=uppr_site)) +
+  geom_point() + 
   coord_flip() + 
   ggtitle("ICC of Site Random Effect") + 
   ylim(0,1)
 ```
 
-```{r, eval=FALSE, include=FALSE}
-## CHUNK NOT INCLUDED
-plot_resid <- function(model){
-  car::qqPlot(residuals(model),dist="norm", main="Residuals")
-}
+#### Subject
 
-#resids <- purrr::map(models, plot_resid) %>% setNames(names(models))
+```{r}
+icc_df %>% 
+  left_join(boot_df %>% 
+            select(-ICC_site, -ICC_subject), by = 'outcome') %>% 
+  mutate(outcome = fct_reorder(outcome, ICC_subject)) %>% 
+  ggplot(aes(x=outcome, y=ICC_subject)) + 
+  geom_errorbar(aes(ymin=lwr_subject, ymax=uppr_subject)) +
+  geom_point() + 
+  coord_flip() + 
+  ggtitle("ICC of Subject Random Effect") + 
+  ylim(0,1)
 ```
 
-```{r, results='asis', eval=FALSE, include=FALSE}
-## CHUNK NOT INCLUDED
-for (name in names(models)){
-  cat("####",  str_replace_all(name, "_", " "), "\n")
-  print(plot_resid(models[[name]]))
-  cat("\n\n")
-}
-```
+After FDR-adjustment, 34 of the 36 variables show site effects according to the mixed models. 
 
-### No Hopkins
+## Mixed Models (No Hopkins)
 
 Here, we report results from the mixed models carried out only on the non-Hopkins data.
 
 ```{r}
-models <- outcomes %>% 
-  lapply(function(x) lmer(reformulate("site + (1|subject) + (1|site)", x), data=filter(df, site != 'Hopkins'))) %>% 
-  setNames(outcomes)
-```
+options(scipen=999)
+#models <- outcomes %>% 
+#  lapply(function(x) lmer(reformulate("(1|subject) + (1|site)", x), data=filter(df, site != 'Hopkins'),
+#                          control=lmerControl(optimizer="bobyqa",
+#                                   optCtrl=list(maxfun=2e8)))) %>% 
+#  setNames(outcomes)
 
-```{r}
-models_0 <- outcomes %>% 
+models <- outcomes %>% 
   lapply(function(x) lmer(reformulate("(1|subject) + (1|site)", x), data=filter(df, site != 'Hopkins'))) %>% 
   setNames(outcomes)
+
+models_0 <- outcomes %>% 
+  lapply(function(x) lmer(reformulate("(1|subject)", x), data=filter(df, site != 'Hopkins'))) %>% 
+  setNames(outcomes)
+
+zero_var_model_names <- get_zero_var_model_names(models)
 ```
+
+<details>
+  <summary>See models with 0 variance</summary>
+  
+```{r}
+for (name in zero_var_model_names){
+  cat('###', name, '\n\n')
+  print(summary(models[[name]]))
+  cat("\n\n")
+}
+```
+  
+</details>
+
+### p-values {.tabset}
 
 ```{r}
-anovas <- purrr::map2(models, models_0, ~ anova(.x, .y)) # deviance test between the two models
-# pull p.values from all tests
-p_vals <- anovas %>% 
-  purrr::map(~ broom::tidy(.x) %>%
-               pull(p.value) %>% 
-               na.omit()) %>% 
-  purrr::reduce(c)
-anova_test_df <- data.frame(outcome = names(anovas), p_val = p_vals) %>% 
-  arrange(p_val) %>% 
-  mutate(p_val_fdr = p.adjust(p_val, method = 'fdr'))
-anova_test_df
+p_df <- purrr::map2(models, models_0, test_variance_term) %>% 
+  setNames(outcomes) %>% 
+  bind_rows(.id = 'outcome') %>% 
+  filter(!(outcome %in% zero_var_model_names)) %>% 
+  select(-pval_naive) %>% 
+  rename(pval = pval_SL) %>% 
+  mutate(pval_fdr = p.adjust(pval, method = 'fdr')) %>% 
+  arrange(pval)
 ```
 
-The table shows that none of the outcome variables showed significant site effects when excluding the Hopkins data.
+#### Plot
+
+```{r}
+p_df %>% 
+  mutate(outcome = fct_reorder(outcome, pval_fdr, .desc = TRUE)) %>% 
+  ggplot(aes(x=outcome, y=pval_fdr)) + 
+  geom_point(size = 2) +
+  geom_hline(yintercept = 0.05, color = 'red') + 
+  coord_flip() + 
+  ggtitle("P-values of Likelihood Ratio Test (Self & Liang 1987)") +
+  ylim(0,1)
+```
+
+#### Data
+
+```{r}
+options(scipen = 999)
+p_df %>% 
+  arrange(pval_fdr)
+```
+
+
+### ICC {.tabset}
+
+ICC for the 35 remaining models is shown below
+
+
+```{r}
+boot_df <- readRDS(here::here('results/avg_tensor_by_roi_wide_no_Hopkins_boot_icc.rds'))
+
+# extract icc_df
+icc_df <- df %>% 
+  filter(site != 'Hopkins') %>% 
+  get_icc()
+options(scipen=999)
+icc_df
+```
+
+#### Site
+
+```{r}
+icc_df %>% 
+  left_join(boot_df %>% 
+              select(-ICC_site, -ICC_subject), by = 'outcome') %>% 
+  mutate(outcome = fct_reorder(outcome, ICC_site)) %>% 
+  ggplot(aes(x=outcome, y=ICC_site)) + 
+  geom_errorbar(aes(ymin=lwr_site, ymax=uppr_site)) +
+  geom_point() + 
+  coord_flip() + 
+  ggtitle("ICC of Site Random Effect") + 
+  ylim(0,1)
+```
+
+#### Subject
+
+```{r}
+icc_df %>% 
+  left_join(boot_df %>% 
+            select(-ICC_site, -ICC_subject), by = 'outcome') %>% 
+  mutate(outcome = fct_reorder(outcome, ICC_subject)) %>% 
+  ggplot(aes(x=outcome, y=ICC_subject)) + 
+  geom_errorbar(aes(ymin=lwr_subject, ymax=uppr_subject)) +
+  geom_point() + 
+  coord_flip() + 
+  ggtitle("ICC of Subject Random Effect") + 
+  ylim(0,1)
+```
+
+After FDR-adjustment, 14 of the 36 variables show site effects according to the mixed models run on non-Hopkins data.
+
+
+
+
+
+
+
 
