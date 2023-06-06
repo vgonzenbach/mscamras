@@ -25,8 +25,7 @@ options(scipen=999)
 df = read.csv(here::here('avg_tensor_by_roi_wide.csv'),
               colClasses = c('subject' = 'factor',
                              'site' = 'factor',
-                             'visit' = 'factor')) %>% 
-  rename(scan = visit)
+                             'visit' = 'factor'))
 outcomes = df %>% 
   select(where(is.numeric)) %>% 
   colnames
@@ -156,9 +155,9 @@ The following table excludes the failed atropos segmentations. Note subject 0300
 
 ```{r}
 t_df <- df %>% 
-  unite(sub, subject, site, scan, sep = '-') %>%
+  unite(sub, subject, site, visit, sep = '-') %>%
   filter(!sub %in% c('04001-NIH-01', '01003-NIH-01', '03002-NIH-02', '04003-NIH-01', '04001-BWH-02', '03001-BWH-01')) %>%
-  separate(sub, c('subject', 'site', 'scan')) %>%
+  separate(sub, c('subject', 'site', 'visit')) %>%
   mutate_if(is.character, as.factor) %>% 
   count(subject, site, .drop = FALSE) %>% 
   tidyr::pivot_wider(names_from = site, values_from = n) %>% 
@@ -174,7 +173,9 @@ t_df
 
 The failed atropos segmentations are included in the following visualizations but were excluded for the site effects tests. 
 
-## Exploratory Data Analysis
+TODO: compare harmonization with and without hopkins
+
+## Visualizations
 
 ### Raw Data
 
@@ -226,7 +227,7 @@ plot_avg_tensor_values <- function(tensor){
                                             "JLF GM", "JLF WM", "JLF THALAMUS",  "FIRST THALAMUS", "MIMOSA LESION"))) %>%
     ggplot(aes(x=site, y=average)) + 
     geom_boxplot(outlier.shape = NA) + 
-    geom_jitter(aes(color = subject, shape=scan), alpha=0.5) +
+    geom_jitter(aes(color = subject, shape=visit), alpha=0.5) +
     #facet_grid(site~.) + 
     facet_grid(segmentation ~ .) +
     coord_flip() +
@@ -333,6 +334,182 @@ As before, medians show differences, particularly for Hopkins.
 plot_avg_tensor_values('AD')
 ```
 
+### Harmonized Data
+
+
+#### Combat estimates
+
+```{r}
+# load harmonized data
+harmonized_df <- read.csv(here::here('results/avg_tensor_by_roi_wide_harmonized.csv'),
+                          colClasses = c('subject' = 'character',
+                             'site' = 'character',
+                             'visit' = 'character'))
+harmonized_no_hopkins_df <- read.csv(here::here('results/avg_tensor_by_roi_wide_no_Hopkins_harmonized.csv'))
+
+# load models
+combat_model <- readRDS(here::here('results/avg_tensor_by_roi_wide_model.csv'))[c("gammahat", "delta2hat", "gammastarhat", "delta2starhat")]
+combat_model_no_hopkins <- readRDS(here::here('results/avg_tensor_by_roi_wide_no_Hopkins_model.csv'))[c("gammahat", "delta2hat", "gammastarhat", "delta2starhat")]
+
+# model parameters
+# what's the best way to plot combat estimates
+```
+
+#### Fractional Anisotropy 
+
+##### Densities {.tabset}
+
+Densities are colored by site, while the black line represents the overall density aggregated across sites. Distribution of the different sites tend to cluster together except for JLF Thalamus. Additionally, note the long tails caused by outliers in the ATROPOS distributions.
+
+```{r}
+plot_densities <- function(var){
+  harmonized_df %>% 
+    ggplot(aes_string(x=var, color='site')) + 
+    geom_density() + 
+    stat_density(aes_string(x = var), geom = "line", color = "black") +
+    theme_bw() + 
+    xlab(str_replace_all(var, "_", " "))
+}
+
+vars <- harmonized_df %>% 
+  select(ends_with('FA')) %>% 
+  colnames()
+dplots <- lapply(vars, plot_densities) %>% 
+  setNames(vars)
+```
+
+```{r, results='asis'}
+for (name in names(dplots)){
+  cat("#####",  str_replace_all(name, "_", " "), "\n")
+  print(dplots[[name]])
+  cat("\n\n")
+}
+```
+
+##### Box plots
+
+Box plots show difference in medians across sites for most variables.  
+Additionally, note the severe outliers in the ATROPOS metrics which correspond to the failed segmentations. For FIRST THALAMUS, subject 01002 could be considered an outlier; their FA values are consistent across sites and scans, however, suggesting this variation is meaningful and that this subject should be retained. 
+
+```{r, warning=FALSE}
+plot_avg_tensor_values <- function(tensor){
+  harmonized_df %>% 
+    select(!is.numeric, ends_with(tensor)) %>% 
+    pivot_longer(ends_with(tensor), names_to = 'seg', values_to = 'average') %>% 
+    separate(seg, into = c('segmentation', 'roi', 'tensor')) %>% 
+    unite(segmentation, segmentation, roi, sep = " ") %>% 
+    mutate(segmentation = factor(segmentation,
+                                 levels = c("ATROPOS GM", "ATROPOS WM", "FAST GM", "FAST WM",
+                                            "JLF GM", "JLF WM", "JLF THALAMUS",  "FIRST THALAMUS", "MIMOSA LESION"))) %>%
+    ggplot(aes(x=site, y=average)) + 
+    geom_boxplot(outlier.shape = NA) + 
+    geom_jitter(aes(color = subject, shape=visit), alpha=0.5) +
+    #facet_grid(site~.) + 
+    facet_grid(segmentation ~ .) +
+    coord_flip() +
+    ggtitle(sprintf("Mean %s in ROI by site", tensor)) +
+    theme_bw() + 
+    # theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust=1)) +
+    xlab("") + 
+    ylab("") + 
+    theme(strip.text.y = element_text(angle = 0)) + 
+    scale_x_discrete(expand = c(0.15, 0.15))
+}
+
+plot_avg_tensor_values('FA')
+```
+
+#### Mean Diffusivity
+
+##### Densities {.tabset}
+
+For Mean Diffusivity, distributions vary more widely across sites. In particular, MIMOSA LESION MD values are quite different for Hopkins data. 
+
+
+```{r}
+vars <- harmonized_df %>% 
+  select(ends_with('MD')) %>% 
+  colnames()
+dplots <- lapply(vars, plot_densities) %>% 
+  setNames(vars)
+```
+
+```{r, results='asis'}
+for (name in names(dplots)){
+  cat("#####", str_replace_all(name, "_", " "), "\n")
+  print(dplots[[name]])
+  cat("\n\n")
+}
+```
+
+##### Boxplot
+
+As before, medians appear to be different across sites. 
+
+```{r}
+plot_avg_tensor_values('MD')
+```
+
+#### Radial Diffusivity
+
+##### Densities {.tabset}
+
+Radial Diffusivity also shows some variations across sites (perhaps less than MD). JLF GM RD in NIH shows multiple peaks, and JLF WM RD shows skewed distributions for all sites. As before the metric for MIMOSA shows a different distribution for Hopkins data. 
+
+```{r}
+vars <-harmonized_df %>% 
+  select(ends_with('RD')) %>% 
+  colnames()
+dplots <- lapply(vars, plot_densities) %>% 
+  setNames(vars)
+```
+
+```{r, results='asis'}
+for (name in names(dplots)){
+  cat("#####",  str_replace_all(name, "_", " "), "\n")
+  print(dplots[[name]])
+  cat("\n\n")
+}
+```
+
+##### Boxplot
+
+As before, medians appear to be differet across sites. 
+
+```{r}
+plot_avg_tensor_values('RD')
+```
+
+#### Axial Diffusivity
+
+##### Densities {.tabset}
+
+For Axial Diffusivity, Hopkins distributions show marked differences across most ROIs compared to other sites. The difference is quite pronounced for MIMOSA.  
+
+```{r}
+vars <-harmonized_df %>% 
+  select(ends_with('AD')) %>% 
+  colnames()
+dplots <- lapply(vars, plot_densities) %>% 
+  setNames(vars)
+```
+
+```{r, results='asis'}
+for (name in names(dplots)){
+  cat("#####",  str_replace_all(name, "_", " "), "\n")
+  print(dplots[[name]])
+  cat("\n\n")
+}
+```
+
+##### Boxplot
+
+As before, medians show differences, particularly for Hopkins.
+
+```{r}
+plot_avg_tensor_values('AD')
+```
+
 ## Permutation Testing of Site Effects 
 
 ```{r}
@@ -341,17 +518,17 @@ fill_na_atropos <- function(df){
   atropos_cols <- df %>% 
   select(contains('ATROPOS')) %>% 
   colnames()
-df[(df$subject == '04001' & df$site == 'NIH' & df$scan == '01') |
-   (df$subject == '01003' & df$site == 'NIH' & df$scan == '01') |
-   (df$subject == '03002' & df$site == 'NIH' & df$scan == '02') |
-   (df$subject == '04003' & df$site == 'NIH' & df$scan == '01') |
-   (df$subject == '04001' & df$site == 'BWH' & df$scan == '02') |
-   (df$subject == '03001' & df$site == 'BWH' & df$scan == '01'), atropos_cols] <- NA
+df[(df$subject == '04001' & df$site == 'NIH' & df$visit == '01') |
+   (df$subject == '01003' & df$site == 'NIH' & df$visit == '01') |
+   (df$subject == '03002' & df$site == 'NIH' & df$visit == '02') |
+   (df$subject == '04003' & df$site == 'NIH' & df$visit == '01') |
+   (df$subject == '04001' & df$site == 'BWH' & df$visit == '02') |
+   (df$subject == '03001' & df$site == 'BWH' & df$visit == '01'), atropos_cols] <- NA
   return(df)
 }
 
 df <- fill_na_atropos(df)
-
+harmonized_df <- fill_na_atropos(harmonized_df)
 ```
 
 The permutation-based F-test was carried out as previously described. The observed F-statistic for each of the metrics is plotted below as a black dot, while the distribution of permuted test statistics is shown as a white violin plot. All metrics showed significant site effects. 
@@ -496,7 +673,7 @@ ratio_stats %>%
 #### p-values {.tabset}
 
 ```{r}
-make_perm_df(ratio_stats, null_dist)
+perm_df <- make_perm_df(ratio_stats, null_dist)
 ```
 
 ##### Plot 
@@ -512,6 +689,93 @@ perm_df %>%
   arrange(desc(p_val))
 ```
 
+### All site  (harmonized)
+
+```{r}
+ratio_stats = readRDS(here::here("results/avg_tensor_by_roi_wide_harmonized_F_df.rds"))
+null_dist = readRDS(here::here("results/avg_tensor_by_roi_wide_harmonized_null_F_df.rds")) %>% 
+  mutate(outcome = map_chr(outcome, unique)) %>% 
+  select(-rowname)
+```
+
+#### F Distributions {.tabset}
+
+##### Plot
+
+```{r, warning=FALSE}
+plot_F_dist(ratio_stats, null_dist)
+```
+
+##### Table
+
+```{r}
+ratio_stats %>% 
+  arrange(desc(F))
+```
+
+
+#### p-values {.tabset}
+
+```{r}
+perm_df <- make_perm_df(ratio_stats, null_dist)
+```
+
+##### Plot 
+
+```{r}
+plot_p_perm(perm_df)
+```
+
+##### Table
+
+```{r}
+perm_df %>% 
+  arrange(desc(p_val))
+```
+
+### No Hopkins  (harmonized)
+
+```{r}
+ratio_stats = readRDS(here::here("results/avg_tensor_by_roi_wide_no_Hopkins_harmonized_F_df.rds"))
+null_dist = readRDS(here::here("results/avg_tensor_by_roi_wide_no_Hopkins_harmonized_null_F_df.rds")) %>% 
+  mutate(outcome = map_chr(outcome, unique)) %>% 
+  select(-rowname)
+```
+
+#### F Distributions {.tabset}
+
+##### Plot
+
+```{r, warning=FALSE}
+plot_F_dist(ratio_stats, null_dist)
+```
+
+##### Table
+
+```{r}
+ratio_stats %>% 
+  arrange(desc(F))
+```
+
+
+#### p-values {.tabset}
+
+```{r}
+perm_df <- make_perm_df(ratio_stats, null_dist)
+```
+
+##### Plot 
+
+```{r}
+plot_p_perm(perm_df)
+```
+
+##### Table
+
+```{r}
+perm_df %>% 
+  arrange(desc(p_val))
+```
 
 ## Mixed Models
 
@@ -597,7 +861,7 @@ make_SL_df <- function(models, models_0){
   purrr::map2(models, models_0, test_variance_term) %>% 
     setNames(outcomes) %>% 
     bind_rows(.id = 'outcome') %>% 
-    filter(!(outcome %in% zero_var_model_names)) %>% 
+    #filter(!(outcome %in% zero_var_model_names)) %>% 
     select(-pval_naive) %>% 
     rename(pval = pval_SL) %>% 
     mutate(pval_fdr = p.adjust(pval, method = 'fdr')) %>% 
@@ -768,6 +1032,159 @@ icc_df
 ```{r}
 options(scipen=999)
 boot_df <- readRDS(here::here('results/avg_tensor_by_roi_wide_no_Hopkins_boot_icc.rds'))
+plot_ICC_site(icc_df, boot_df)
+```
+
+##### Subject
+
+```{r}
+plot_ICC_subject(icc_df, boot_df)
+```
+
+After FDR-adjustment, 14 of the 36 variables show site effects according to the mixed models run on non-Hopkins data.
+
+### All sites (harmonized data)
+
+Here, we report results from the mixed models carried out only on the non-Hopkins data.
+
+```{r}
+models <- harmonized_df %>% 
+  run_full_models()
+
+models_0 <- harmonized_df %>% 
+  run_null_models()
+
+zero_var_model_names <- get_zero_var_model_names(models)
+```
+
+<details>
+  <summary>See models with 0 variance</summary>
+  
+```{r}
+for (name in zero_var_model_names){
+  cat('###', name, '\n\n')
+  print(summary(models[[name]]))
+  cat("\n\n")
+}
+```
+  
+</details>
+
+#### p-values {.tabset}
+
+```{r}
+p_df <- make_SL_df(models, models_0)
+```
+
+##### Plot
+
+```{r}
+plot_p_SL(p_df)
+```
+
+##### Table
+
+```{r}
+options(scipen = 999)
+p_df %>% 
+  arrange(pval_fdr)
+```
+
+
+#### ICC {.tabset}
+
+ICC for the 35 remaining models is shown below
+
+```{r}
+# extract icc_df
+icc_df <- harmonized_df %>% 
+  get_icc()
+
+icc_df
+```
+
+##### Site
+
+```{r}
+options(scipen=999)
+boot_df <- readRDS(here::here('results/avg_tensor_by_roi_wide_harmonized_boot_icc.rds'))
+plot_ICC_site(icc_df, boot_df)
+```
+
+##### Subject
+
+```{r}
+plot_ICC_subject(icc_df, boot_df)
+```
+
+After FDR-adjustment, 14 of the 36 variables show site effects according to the mixed models run on non-Hopkins data.
+
+### No Hopkins (harmonized)
+
+Here, we report results from the mixed models carried out only on the non-Hopkins data.
+
+```{r}
+models <- harmonized_no_hopkins_df %>% 
+  run_full_models()
+
+models_0 <- harmonized_no_hopkins_df %>% 
+  run_null_models()
+
+zero_var_model_names <- get_zero_var_model_names(models)
+```
+
+<details>
+  <summary>See models with 0 variance</summary>
+  
+```{r}
+for (name in zero_var_model_names){
+  cat('###', name, '\n\n')
+  print(summary(models[[name]]))
+  cat("\n\n")
+}
+```
+  
+</details>
+
+#### p-values {.tabset}
+
+```{r}
+p_df <- make_SL_df(models, models_0)
+```
+
+##### Plot
+
+```{r}
+plot_p_SL(p_df)
+```
+
+##### Table
+
+```{r}
+options(scipen = 999)
+p_df %>% 
+  arrange(pval_fdr)
+```
+
+
+#### ICC {.tabset}
+
+ICC for the 35 remaining models is shown below
+
+
+```{r}
+# extract icc_df
+icc_df <- harmonized_no_hopkins_df %>% 
+  get_icc()
+
+icc_df
+```
+
+##### Site
+
+```{r}
+options(scipen=999)
+boot_df <- readRDS(here::here('results/avg_tensor_by_roi_wide_no_Hopkins_harmonized_boot_icc.rds'))
 plot_ICC_site(icc_df, boot_df)
 ```
 
