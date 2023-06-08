@@ -94,18 +94,18 @@ $$ p = \frac{10000*p_0 + 1}{10000 + 1}$$
 
 #### Crossed-design Mixed Linear Models
 
-As an additional test of site effects, mixed models were performed corresponding to a crossed design using the `lmer` function of the `lme4` package. For each outcome variable, two mixed-effects models were fitted: The formula for the base model includes a random intercept for site as well as a random intercept for subject. The formula for the extended model also includes these terms in addition to a fixed effect term for site. 
+As an additional test of site effects, mixed models were performed corresponding to a crossed design using the `lmer` function of the `lme4` package. For each outcome variable, two mixed-effects models were fitted: The formula for the base model includes a random intercept for subject. The formula for the extended model also includes a random intercept for site. 
 
 Base Model:
 
 ```
-y ~ (1|subject) + (1|site)
+y ~ (1|subject) 
 ```
 
 Extended model:
 
 ```
-y ~ site + (1|subject) + (1|site)
+y ~ (1|subject) + (1|site)
 ```
 
 For each outcome, these two models were compared through a deviance test using the `anova` function in R. P-values for these tests are reported as a test of site effects. 
@@ -204,7 +204,7 @@ dplots <- lapply(vars, plot_densities) %>%
 
 ```{r, results='asis'}
 for (name in names(dplots)){
-  cat("#####",  str_replace_all(name, "_", " "), "\n")
+  cat("######",  str_replace_all(name, "_", " "), "\n")
   print(dplots[[name]])
   cat("\n\n")
 }
@@ -260,7 +260,7 @@ dplots <- lapply(vars, plot_densities) %>%
 
 ```{r, results='asis'}
 for (name in names(dplots)){
-  cat("#####", str_replace_all(name, "_", " "), "\n")
+  cat("######", str_replace_all(name, "_", " "), "\n")
   print(dplots[[name]])
   cat("\n\n")
 }
@@ -290,7 +290,7 @@ dplots <- lapply(vars, plot_densities) %>%
 
 ```{r, results='asis'}
 for (name in names(dplots)){
-  cat("#####",  str_replace_all(name, "_", " "), "\n")
+  cat("######",  str_replace_all(name, "_", " "), "\n")
   print(dplots[[name]])
   cat("\n\n")
 }
@@ -320,7 +320,7 @@ dplots <- lapply(vars, plot_densities) %>%
 
 ```{r, results='asis'}
 for (name in names(dplots)){
-  cat("#####",  str_replace_all(name, "_", " "), "\n")
+  cat("######",  str_replace_all(name, "_", " "), "\n")
   print(dplots[[name]])
   cat("\n\n")
 }
@@ -336,10 +336,11 @@ plot_avg_tensor_values('AD')
 
 ### Harmonized Data
 
+```{r}
+## NOT INCLUDED !!!!!!-----------
+
 
 #### Combat estimates
-
-```{r}
 # load harmonized data
 harmonized_df <- read.csv(here::here('results/avg_tensor_by_roi_wide_harmonized.csv'),
                           colClasses = c('subject' = 'character',
@@ -380,7 +381,7 @@ dplots <- lapply(vars, plot_densities) %>%
 
 ```{r, results='asis'}
 for (name in names(dplots)){
-  cat("#####",  str_replace_all(name, "_", " "), "\n")
+  cat("######",  str_replace_all(name, "_", " "), "\n")
   print(dplots[[name]])
   cat("\n\n")
 }
@@ -436,7 +437,7 @@ dplots <- lapply(vars, plot_densities) %>%
 
 ```{r, results='asis'}
 for (name in names(dplots)){
-  cat("#####", str_replace_all(name, "_", " "), "\n")
+  cat("######", str_replace_all(name, "_", " "), "\n")
   print(dplots[[name]])
   cat("\n\n")
 }
@@ -466,7 +467,7 @@ dplots <- lapply(vars, plot_densities) %>%
 
 ```{r, results='asis'}
 for (name in names(dplots)){
-  cat("#####",  str_replace_all(name, "_", " "), "\n")
+  cat("######",  str_replace_all(name, "_", " "), "\n")
   print(dplots[[name]])
   cat("\n\n")
 }
@@ -496,7 +497,7 @@ dplots <- lapply(vars, plot_densities) %>%
 
 ```{r, results='asis'}
 for (name in names(dplots)){
-  cat("#####",  str_replace_all(name, "_", " "), "\n")
+  cat("######",  str_replace_all(name, "_", " "), "\n")
   print(dplots[[name]])
   cat("\n\n")
 }
@@ -602,13 +603,13 @@ make_perm_df <- function(ratio_stats, null_dist){
     unnest() %>% 
     select(!!!colnames(observed_F)) # re-order columns to match observed
   
-  p_df <- data.frame(p_val = test_ratio_stat(observed_F, null_Fs))
+  p_df <- data.frame(pval = test_ratio_stat(observed_F, null_Fs))
   
   perm_df <- cbind(
     ratio_stats %>% 
       select(F),
     p_df %>% 
-      mutate(pval_fdr = p.adjust(p_val, method = 'fdr'))
+      mutate(pval_fdr = p.adjust(pval, method = 'fdr'))
   )
   return(perm_df)
 }
@@ -638,10 +639,87 @@ plot_p_perm(perm_df)
 
 ```{r}
 perm_df %>% 
-  arrange(desc(p_val))
+  arrange(desc(pval))
 ```
 
-There were 35 out of 36 significant site effects according to permutation test.
+
+#### Effect size: f2
+
+```{r}
+### Make this into a function
+# Full models
+
+#' get f2 via Nakagawa's R2 for mixed models
+#' 
+#' @param data my dataframe 
+#' @param r2_type the type of R2 to calculate: 'c' for conditional or 'm' for marginal (see Nakagawa, S., and Schielzeth, H. (2013) for details)
+get_f2 <- function(data, r2_type = 'c'){
+  run_full_models <- function(data){
+    models <- outcomes %>% 
+     lapply(function(x) lmer(reformulate("(1|subject) + site", x), data=data)) %>% 
+     setNames(outcomes)
+    return(models)
+  }
+  
+  # Null models
+  run_null_models <- function(data){
+    models_0 <- outcomes %>% 
+      lapply(function(x) lmer(reformulate("(1|subject)", x), data=data)) %>% 
+      setNames(outcomes)
+    return(models_0)
+  }
+  
+  get_r2 <- function(mod){
+    case_when(r2_type == 'c' ~ performance::r2_nakagawa(mod)$R2_conditional, 
+              r2_type == 'm' ~ performance::r2_nakagawa(mod)$R2_marginal)
+  } 
+  
+  models <- run_full_models(data)
+  models_0 <- run_null_models(data)
+  
+  R2_ab <- map_dbl(models, get_r2)
+  R2_a <- map_dbl(models_0, get_r2)
+  
+  f2 <- (R2_ab - R2_a)/(1 - R2_ab)
+  
+  data.frame(f2 = f2, 
+             R2_ab = R2_ab,
+             R2_a = R2_a)
+}
+
+get_f2(df) %>% 
+  arrange(desc(f2))
+```
+
+#### FK test
+
+```{r}
+run_FK_test <- function(data){
+  run_full_models <- function(data){
+    models <- outcomes %>% 
+     lapply(function(x) lmer(reformulate("(1|subject) + site", x), data=data)) %>% 
+     setNames(outcomes)
+    return(models)
+  }
+
+  models <- run_full_models(data)
+  
+  FK_df <- map(models, ~ cbind(.x@frame, data.frame(resid = residuals(.x)))) %>% # make residual column for each @frame in model output
+    map(~fligner.test(.x$resid, .x$site)) %>% # run FK test on all residuals
+    map(~data.frame(ChiSq = .x$statistic, DF = .x$parameter, pval = .x$p.value)) %>% # extract results from FK tests
+    bind_rows(.id = 'outcome')
+  
+  # correct pvalues
+  FK_df <- FK_df %>% 
+    mutate(pval_fdr = p.adjust(pval, method='fdr'))
+  rownames(FK_df) <- NULL
+  return(FK_df)
+}
+  
+df %>% 
+  run_FK_test() %>% 
+  arrange(pval)
+```
 
 ### No Hopkins (raw)
 
@@ -686,7 +764,25 @@ plot_p_perm(perm_df)
 
 ```{r}
 perm_df %>% 
-  arrange(desc(p_val))
+  arrange(desc(pval))
+```
+
+#### Effect size: f2
+
+```{r}
+df %>% 
+  filter(site != 'Hopkins') %>% 
+  get_f2() %>% 
+  arrange(desc(f2))
+```
+
+#### FK test
+
+```{r}
+df %>% 
+  filter(site != 'Hopkins') %>% 
+  run_FK_test() %>% 
+  arrange(pval)
 ```
 
 ### All site  (harmonized)
@@ -730,7 +826,23 @@ plot_p_perm(perm_df)
 
 ```{r}
 perm_df %>% 
-  arrange(desc(p_val))
+  arrange(desc(pval))
+```
+
+#### Effect size: f2
+
+```{r}
+harmonized_df %>% 
+  get_f2() %>% 
+  arrange(desc(f2))
+```
+
+#### FK test
+
+```{r}
+harmonized_df %>% 
+  run_FK_test() %>% 
+  arrange(pval)
 ```
 
 ### No Hopkins  (harmonized)
@@ -774,18 +886,34 @@ plot_p_perm(perm_df)
 
 ```{r}
 perm_df %>% 
-  arrange(desc(p_val))
+  arrange(desc(pval))
+```
+
+#### Effect size: f2
+
+```{r}
+harmonized_no_hopkins_df %>% 
+  get_f2() %>% 
+  arrange(desc(f2))
+```
+
+#### FK test
+
+```{r}
+harmonized_no_hopkins_df %>% 
+  run_FK_test() %>% 
+  arrange(pval)
 ```
 
 ## Mixed Models
 
-### All Sites (raw data)
-
 For each of the 36 outcome variables, two mixed models (a base and an extended model) were fit and the extended model of interest was compared against the null/base model using a likelihood ratio test. The resulting p-values are reported. ICCs based on the extented model are also reported. 
+
+### All Sites (raw data)
 
 Of note, two of the models estimated a 0 variance for the site random effect. P-values and ICCs are not provided for these two models.
 
-```{r}
+```{r, warning=TRUE}
 # Full models
 run_full_models <- function(data){
   models <- outcomes %>% 
@@ -839,6 +967,8 @@ get_zero_var_model_names <- function(models){
 models <- run_full_models(df)
 models_0 <- run_null_models(df)
 zero_var_model_names <- get_zero_var_model_names(models)
+
+singular_models <- names(which(map_lgl(models, isSingular)))
 ```
 
 <details>
@@ -853,6 +983,30 @@ for (name in zero_var_model_names){
 ```
   
 </details>
+
+<details>
+  <summary>See models with 'singular' warning</summary>
+  
+```{r}
+for (name in singular_models){
+  cat('###', name, '\n\n')
+  print(summary(models[[name]]))
+  cat("\n\n")
+}
+```
+  
+</details>
+
+<details>
+  <summary>See model residuals</summary>
+  
+```{r,}
+plot_resid <- function(mod, name) car::qqPlot(residuals(mod),dist="norm", main=glue::glue("{name} Residuals"))
+imap(models, plot_resid)
+```
+  
+</details>
+
 
 #### p-values {.tabset}
 
@@ -896,7 +1050,7 @@ options(scipen = 999)
 p_df
 ```
 
-#### ICC {.tabset}
+#### Effect size: ICC {.tabset}
 
 ICC for the 35 remaining models is shown
 
@@ -967,7 +1121,7 @@ After FDR-adjustment, 34 of the 36 variables show site effects according to the 
 
 Here, we report results from the mixed models carried out only on the non-Hopkins data.
 
-```{r}
+```{r, warning=TRUE}
 models <- df %>% 
   filter(site != 'Hopkins') %>% 
   run_full_models()
@@ -977,6 +1131,7 @@ models_0 <- df %>%
   run_null_models()
 
 zero_var_model_names <- get_zero_var_model_names(models)
+singular_models <- names(which(map_lgl(models, isSingular)))
 ```
 
 <details>
@@ -988,6 +1143,29 @@ for (name in zero_var_model_names){
   print(summary(models[[name]]))
   cat("\n\n")
 }
+```
+  
+</details>
+
+<details>
+  <summary>See models with 'singular' warning</summary>
+  
+```{r}
+for (name in singular_models){
+  cat('###', name, '\n\n')
+  print(summary(models[[name]]))
+  cat("\n\n")
+}
+```
+  
+</details>
+
+<details>
+  <summary>See model residuals</summary>
+  
+```{r,}
+plot_resid <- function(mod, name) car::qqPlot(residuals(mod),dist="norm", main=glue::glue("{name} Residuals"))
+imap(models, plot_resid)
 ```
   
 </details>
@@ -1013,7 +1191,7 @@ p_df %>%
 ```
 
 
-#### ICC {.tabset}
+#### Effect size: ICC {.tabset}
 
 ICC for the 35 remaining models is shown below
 
@@ -1047,7 +1225,7 @@ After FDR-adjustment, 14 of the 36 variables show site effects according to the 
 
 Here, we report results from the mixed models carried out only on the non-Hopkins data.
 
-```{r}
+```{r, warning=TRUE}
 models <- harmonized_df %>% 
   run_full_models()
 
@@ -1055,6 +1233,7 @@ models_0 <- harmonized_df %>%
   run_null_models()
 
 zero_var_model_names <- get_zero_var_model_names(models)
+singular_models <- names(which(map_lgl(models, isSingular)))
 ```
 
 <details>
@@ -1066,6 +1245,29 @@ for (name in zero_var_model_names){
   print(summary(models[[name]]))
   cat("\n\n")
 }
+```
+  
+</details>
+
+<details>
+  <summary>See models with 'singular' warning</summary>
+  
+```{r}
+for (name in singular_models){
+  cat('###', name, '\n\n')
+  print(summary(models[[name]]))
+  cat("\n\n")
+}
+```
+  
+</details>
+
+<details>
+  <summary>See model residuals</summary>
+  
+```{r,}
+plot_resid <- function(mod, name) car::qqPlot(residuals(mod),dist="norm", main=glue::glue("{name} Residuals"))
+imap(models, plot_resid)
 ```
   
 </details>
@@ -1091,7 +1293,7 @@ p_df %>%
 ```
 
 
-#### ICC {.tabset}
+#### Effect size: ICC {.tabset}
 
 ICC for the 35 remaining models is shown below
 
@@ -1131,6 +1333,7 @@ models_0 <- harmonized_no_hopkins_df %>%
   run_null_models()
 
 zero_var_model_names <- get_zero_var_model_names(models)
+singular_models <- names(which(map_lgl(models, isSingular)))
 ```
 
 <details>
@@ -1142,6 +1345,29 @@ for (name in zero_var_model_names){
   print(summary(models[[name]]))
   cat("\n\n")
 }
+```
+  
+</details>
+
+<details>
+  <summary>See models with 'singular' warning</summary>
+  
+```{r}
+for (name in singular_models){
+  cat('###', name, '\n\n')
+  print(summary(models[[name]]))
+  cat("\n\n")
+}
+```
+  
+</details>
+
+<details>
+  <summary>See model residuals</summary>
+  
+```{r,}
+plot_resid <- function(mod, name) car::qqPlot(residuals(mod),dist="norm", main=glue::glue("{name} Residuals"))
+imap(models, plot_resid)
 ```
   
 </details>
@@ -1167,10 +1393,9 @@ p_df %>%
 ```
 
 
-#### ICC {.tabset}
+#### Effect size: ICC {.tabset}
 
 ICC for the 35 remaining models is shown below
-
 
 ```{r}
 # extract icc_df
