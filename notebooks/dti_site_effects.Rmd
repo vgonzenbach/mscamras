@@ -7,6 +7,7 @@ output:
     theme: united
     toc: true
     toc_float: true
+    toc_depth: 3
     code_folding: hide
     df_print: paged
     fig_width: 10
@@ -29,6 +30,16 @@ df = read.csv(here::here('avg_tensor_by_roi_wide.csv'),
 outcomes = df %>% 
   select(where(is.numeric)) %>% 
   colnames
+
+harmonized_df <- read.csv(here::here('results/avg_tensor_by_roi_wide_harmonized.csv'),
+              colClasses = c('subject' = 'factor',
+                             'site' = 'factor',
+                             'visit' = 'factor'))
+
+harmonized_no_hopkins_df <- read.csv(here::here('results/avg_tensor_by_roi_wide_no_Hopkins_harmonized.csv'),
+              colClasses = c('subject' = 'factor',
+                             'site' = 'factor',
+                             'visit' = 'factor'))
 ```
 
 ## Summary 
@@ -92,6 +103,31 @@ For each metric, the observed test statistic was compared to a distribution of t
 
 $$ p = \frac{10000*p_0 + 1}{10000 + 1}$$
 
+To quantify these site effects, $f^2$ u$R^2$ was computed from the model `outcome ~ (1|subject) + site` (i.e. $y_{ijk}$ following the method in Nakagawa & Schielzeth (2013), which is implemented in `performance::r2_nakagawa`. Thus, the (marginal) $R^2$ quantifies the proportion of variance explained by the fixed effect relative to the total variance:
+
+$$ R^2_{(m)} = \frac{\sigma_{site}^2}{\sigma_{site}^2 + \sigma_{subject}^2 + \sigma_{\epsilon}^2}$$
+
+
+where:   
+
+- $\sigma^2_{site}$ is the variance from the fixed effect component corresponding to site, see eqn. 27 in reference.
+- $\sigma^2_{subject}$ is the variance component of the random effect for subject.  
+- $\sigma^2_{\epsilon}$ is the variance of the residuals.
+
+The residuals from these models were subsequently utilized to test for the presence of multiplicative site effects (i.e. differences in site-specific variance) using the Fligner-Killeen test ( (Fligner, & Killeen, 1976). The FK test was chosen for its robustness under non-normality and high power for small samples (Conover, Johnson, & Johnson, 1981). 
+
+<details>
+  <summary> See details of the FK test implementation</summary>
+  
+  The residuals are first centered by their site-specific median and their absolute value is taken. Then, these median-centered absolute-valued residuals $x_i$ are given a score $a_i$ based on their rank (in the full sample) via the function $$ a_i = \phi^{-1} ( \frac{1}{2} + \frac{rank(x_i)}{2(N + 1)}))$$, where $\phi$ represents the normal CDF (thus $\phi^{-1}$ is its quantile function). The FK test follows a $\chi^2$ distribution with $m - 1$ degrees of freedom (for $m$ sites) and is given by the formula $$\sum_{j=1}^{m}\frac{n_j(\bar{a}_j - \bar{a} )^2}{s^2_j}$$ where   
+  
+- $s^2_j = \frac{1}{N - 1} (\bar{a}_j - \bar{a})^2$ is the sample variance for site $j$. 
+- $\bar{a}_j$ is the mean of site $j$. 
+- $\bar{a}$ is the grand mean. 
+- $n_j$ is the sample size for site $j$.
+  
+</details>
+
 #### Crossed-design Mixed Linear Models
 
 As an additional test of site effects, mixed models were performed corresponding to a crossed design using the `lmer` function of the `lme4` package. For each outcome variable, two mixed-effects models were fitted: The formula for the base model includes a random intercept for subject. The formula for the extended model also includes a random intercept for site. 
@@ -99,16 +135,18 @@ As an additional test of site effects, mixed models were performed corresponding
 Base Model:
 
 ```
-y ~ (1|subject) 
+outcome ~ (1|subject) 
 ```
 
 Extended model:
 
 ```
-y ~ (1|subject) + (1|site)
+outcome ~ (1|subject) + (1|site)
 ```
 
-For each outcome, these two models were compared through a deviance test using the `anova` function in R. P-values for these tests are reported as a test of site effects. 
+For each of the outcome variables, these two models were compared through an asymptotic Likelihood Ratio Test according to Self & Liang (1987). Thus, the final p-values for these tests were calculated using a 50:50 mixture of a $\chi^2_1$ and $\chi^2_2$ distributions. 
+
+To illustrate effect sizes, ICC for both site and subject random intercepts was computed for the full model using the `performance::icc` function. 95% Confidence Intervals for the full models were computed via bootstrapping ($B=5000$). The subject IDs were sampled with replacement. For each iteration, a bootstrap dataset was constructed by selecting all rows from the original dataset that correspond to the given subject ID. As repetition of subject IDs was possible, duplicate rows were also possible. The 2.5 and 97.5 pecentiles of the overall bootstrap distribution served as the limits of the 95% CI. 
 
 [Source code](https://github.com/vgonzenbach/mscamras/tree/dti) for this project can be found on GitHub.
 
@@ -186,8 +224,8 @@ TODO: compare harmonization with and without hopkins
 Densities are colored by site, while the black line represents the overall density aggregated across sites. Distribution of the different sites tend to cluster together except for JLF Thalamus. Additionally, note the long tails caused by outliers in the ATROPOS distributions.
 
 ```{r}
-plot_densities <- function(var){
-  df %>% 
+plot_densities <- function(var, data){
+  data %>% 
     ggplot(aes_string(x=var, color='site')) + 
     geom_density() + 
     stat_density(aes_string(x = var), geom = "line", color = "black") +
@@ -198,7 +236,7 @@ plot_densities <- function(var){
 vars <-df %>% 
   select(ends_with('FA')) %>% 
   colnames()
-dplots <- lapply(vars, plot_densities) %>% 
+dplots <- lapply(vars, plot_densities, data=df) %>% 
   setNames(vars)
 ```
 
@@ -216,8 +254,8 @@ Box plots show difference in medians across sites for most variables.
 Additionally, note the severe outliers in the ATROPOS metrics which correspond to the failed segmentations. For FIRST THALAMUS, subject 01002 could be considered an outlier; their FA values are consistent across sites and scans, however, suggesting this variation is meaningful and that this subject should be retained. 
 
 ```{r, warning=FALSE}
-plot_avg_tensor_values <- function(tensor){
-  df %>% 
+plot_avg_tensor_values <- function(tensor, data=df){
+  data %>% 
     select(!is.numeric, ends_with(tensor)) %>% 
     pivot_longer(ends_with(tensor), names_to = 'seg', values_to = 'average') %>% 
     separate(seg, into = c('segmentation', 'roi', 'tensor')) %>% 
@@ -254,7 +292,7 @@ For Mean Diffusivity, distributions vary more widely across sites. In particular
 vars <-df %>% 
   select(ends_with('MD')) %>% 
   colnames()
-dplots <- lapply(vars, plot_densities) %>% 
+dplots <- lapply(vars, plot_densities, data=df) %>% 
   setNames(vars)
 ```
 
@@ -284,7 +322,7 @@ Radial Diffusivity also shows some variations across sites (perhaps less than MD
 vars <-df %>% 
   select(ends_with('RD')) %>% 
   colnames()
-dplots <- lapply(vars, plot_densities) %>% 
+dplots <- lapply(vars, plot_densities, data=df) %>% 
   setNames(vars)
 ```
 
@@ -314,184 +352,7 @@ For Axial Diffusivity, Hopkins distributions show marked differences across most
 vars <-df %>% 
   select(ends_with('AD')) %>% 
   colnames()
-dplots <- lapply(vars, plot_densities) %>% 
-  setNames(vars)
-```
-
-```{r, results='asis'}
-for (name in names(dplots)){
-  cat("######",  str_replace_all(name, "_", " "), "\n")
-  print(dplots[[name]])
-  cat("\n\n")
-}
-```
-
-##### Boxplot
-
-As before, medians show differences, particularly for Hopkins.
-
-```{r}
-plot_avg_tensor_values('AD')
-```
-
-### Harmonized Data
-
-```{r}
-## NOT INCLUDED !!!!!!-----------
-
-
-#### Combat estimates
-# load harmonized data
-harmonized_df <- read.csv(here::here('results/avg_tensor_by_roi_wide_harmonized.csv'),
-                          colClasses = c('subject' = 'character',
-                             'site' = 'character',
-                             'visit' = 'character'))
-harmonized_no_hopkins_df <- read.csv(here::here('results/avg_tensor_by_roi_wide_no_Hopkins_harmonized.csv'))
-
-# load models
-combat_model <- readRDS(here::here('results/avg_tensor_by_roi_wide_model.csv'))[c("gammahat", "delta2hat", "gammastarhat", "delta2starhat")]
-combat_model_no_hopkins <- readRDS(here::here('results/avg_tensor_by_roi_wide_no_Hopkins_model.csv'))[c("gammahat", "delta2hat", "gammastarhat", "delta2starhat")]
-
-# model parameters
-# what's the best way to plot combat estimates
-```
-
-#### Fractional Anisotropy 
-
-##### Densities {.tabset}
-
-Densities are colored by site, while the black line represents the overall density aggregated across sites. Distribution of the different sites tend to cluster together except for JLF Thalamus. Additionally, note the long tails caused by outliers in the ATROPOS distributions.
-
-```{r}
-plot_densities <- function(var){
-  harmonized_df %>% 
-    ggplot(aes_string(x=var, color='site')) + 
-    geom_density() + 
-    stat_density(aes_string(x = var), geom = "line", color = "black") +
-    theme_bw() + 
-    xlab(str_replace_all(var, "_", " "))
-}
-
-vars <- harmonized_df %>% 
-  select(ends_with('FA')) %>% 
-  colnames()
-dplots <- lapply(vars, plot_densities) %>% 
-  setNames(vars)
-```
-
-```{r, results='asis'}
-for (name in names(dplots)){
-  cat("######",  str_replace_all(name, "_", " "), "\n")
-  print(dplots[[name]])
-  cat("\n\n")
-}
-```
-
-##### Box plots
-
-Box plots show difference in medians across sites for most variables.  
-Additionally, note the severe outliers in the ATROPOS metrics which correspond to the failed segmentations. For FIRST THALAMUS, subject 01002 could be considered an outlier; their FA values are consistent across sites and scans, however, suggesting this variation is meaningful and that this subject should be retained. 
-
-```{r, warning=FALSE}
-plot_avg_tensor_values <- function(tensor){
-  harmonized_df %>% 
-    select(!is.numeric, ends_with(tensor)) %>% 
-    pivot_longer(ends_with(tensor), names_to = 'seg', values_to = 'average') %>% 
-    separate(seg, into = c('segmentation', 'roi', 'tensor')) %>% 
-    unite(segmentation, segmentation, roi, sep = " ") %>% 
-    mutate(segmentation = factor(segmentation,
-                                 levels = c("ATROPOS GM", "ATROPOS WM", "FAST GM", "FAST WM",
-                                            "JLF GM", "JLF WM", "JLF THALAMUS",  "FIRST THALAMUS", "MIMOSA LESION"))) %>%
-    ggplot(aes(x=site, y=average)) + 
-    geom_boxplot(outlier.shape = NA) + 
-    geom_jitter(aes(color = subject, shape=visit), alpha=0.5) +
-    #facet_grid(site~.) + 
-    facet_grid(segmentation ~ .) +
-    coord_flip() +
-    ggtitle(sprintf("Mean %s in ROI by site", tensor)) +
-    theme_bw() + 
-    # theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust=1)) +
-    xlab("") + 
-    ylab("") + 
-    theme(strip.text.y = element_text(angle = 0)) + 
-    scale_x_discrete(expand = c(0.15, 0.15))
-}
-
-plot_avg_tensor_values('FA')
-```
-
-#### Mean Diffusivity
-
-##### Densities {.tabset}
-
-For Mean Diffusivity, distributions vary more widely across sites. In particular, MIMOSA LESION MD values are quite different for Hopkins data. 
-
-
-```{r}
-vars <- harmonized_df %>% 
-  select(ends_with('MD')) %>% 
-  colnames()
-dplots <- lapply(vars, plot_densities) %>% 
-  setNames(vars)
-```
-
-```{r, results='asis'}
-for (name in names(dplots)){
-  cat("######", str_replace_all(name, "_", " "), "\n")
-  print(dplots[[name]])
-  cat("\n\n")
-}
-```
-
-##### Boxplot
-
-As before, medians appear to be different across sites. 
-
-```{r}
-plot_avg_tensor_values('MD')
-```
-
-#### Radial Diffusivity
-
-##### Densities {.tabset}
-
-Radial Diffusivity also shows some variations across sites (perhaps less than MD). JLF GM RD in NIH shows multiple peaks, and JLF WM RD shows skewed distributions for all sites. As before the metric for MIMOSA shows a different distribution for Hopkins data. 
-
-```{r}
-vars <-harmonized_df %>% 
-  select(ends_with('RD')) %>% 
-  colnames()
-dplots <- lapply(vars, plot_densities) %>% 
-  setNames(vars)
-```
-
-```{r, results='asis'}
-for (name in names(dplots)){
-  cat("######",  str_replace_all(name, "_", " "), "\n")
-  print(dplots[[name]])
-  cat("\n\n")
-}
-```
-
-##### Boxplot
-
-As before, medians appear to be differet across sites. 
-
-```{r}
-plot_avg_tensor_values('RD')
-```
-
-#### Axial Diffusivity
-
-##### Densities {.tabset}
-
-For Axial Diffusivity, Hopkins distributions show marked differences across most ROIs compared to other sites. The difference is quite pronounced for MIMOSA.  
-
-```{r}
-vars <-harmonized_df %>% 
-  select(ends_with('AD')) %>% 
-  colnames()
-dplots <- lapply(vars, plot_densities) %>% 
+dplots <- lapply(vars, plot_densities, data=df) %>% 
   setNames(vars)
 ```
 
@@ -515,7 +376,7 @@ plot_avg_tensor_values('AD')
 
 ```{r}
 # replace ATROPOS measures with NA for select images (segmentation failed)
-fill_na_atropos <- function(df){
+fill_na_atropos <- function(data){
   atropos_cols <- df %>% 
   select(contains('ATROPOS')) %>% 
   colnames()
@@ -529,7 +390,7 @@ df[(df$subject == '04001' & df$site == 'NIH' & df$visit == '01') |
 }
 
 df <- fill_na_atropos(df)
-harmonized_df <- fill_na_atropos(harmonized_df)
+#harmonized_df <- fill_na_atropos(harmonized_df)
 ```
 
 The permutation-based F-test was carried out as previously described. The observed F-statistic for each of the metrics is plotted below as a black dot, while the distribution of permuted test statistics is shown as a white violin plot. All metrics showed significant site effects. 
@@ -614,7 +475,7 @@ make_perm_df <- function(ratio_stats, null_dist){
   return(perm_df)
 }
 
-perm_df <- make_perm_df(ratio_stats, null_dist)
+perm_df1 <- perm_df <- make_perm_df(ratio_stats, null_dist)
 ```
 
 ##### Plot 
@@ -643,7 +504,7 @@ perm_df %>%
 ```
 
 
-#### Effect size: f2
+#### Effect size: f2 {.tabset}
 
 ```{r}
 ### Make this into a function
@@ -653,7 +514,7 @@ perm_df %>%
 #' 
 #' @param data my dataframe 
 #' @param r2_type the type of R2 to calculate: 'c' for conditional or 'm' for marginal (see Nakagawa, S., and Schielzeth, H. (2013) for details)
-get_f2 <- function(data, r2_type = 'c'){
+get_f2 <- function(data, r2_type = 'm'){
   run_full_models <- function(data){
     models <- outcomes %>% 
      lapply(function(x) lmer(reformulate("(1|subject) + site", x), data=data)) %>% 
@@ -661,12 +522,11 @@ get_f2 <- function(data, r2_type = 'c'){
     return(models)
   }
   
-  # Null models
   run_null_models <- function(data){
-    models_0 <- outcomes %>% 
-      lapply(function(x) lmer(reformulate("(1|subject)", x), data=data)) %>% 
-      setNames(outcomes)
-    return(models_0)
+    models <- outcomes %>% 
+     lapply(function(x) lmer(reformulate("(1|subject)", x), data=data)) %>% 
+     setNames(outcomes)
+    return(models)
   }
   
   get_r2 <- function(mod){
@@ -675,23 +535,47 @@ get_f2 <- function(data, r2_type = 'c'){
   } 
   
   models <- run_full_models(data)
+  
   models_0 <- run_null_models(data)
   
   R2_ab <- map_dbl(models, get_r2)
+  
   R2_a <- map_dbl(models_0, get_r2)
   
-  f2 <- (R2_ab - R2_a)/(1 - R2_ab)
   
-  data.frame(f2 = f2, 
-             R2_ab = R2_ab,
-             R2_a = R2_a)
+  data.frame(f2 = (R2_ab - R2_a)/(1 - R2_ab),
+             R2_ab,
+             R2_a)
 }
 
-get_f2(df) %>% 
+f2_df <- get_f2(df) %>% 
   arrange(desc(f2))
 ```
 
-#### FK test
+##### Plot 
+
+```{r}
+plot_f2 <- function(f2_df){
+  f2_df %>% 
+  rownames_to_column('outcome') %>% 
+  mutate(outcome = fct_reorder(outcome, f2)) %>% 
+  ggplot(aes(x=outcome, y=f2)) + 
+  geom_point() +
+  coord_flip() + 
+  ggtitle("f2 of fixed site effect per outcome")
+}
+
+plot_f2(f2_df)
+```
+
+
+##### Table
+
+```{r}
+f2_df
+```
+
+#### FK test {.tabset}
 
 ```{r}
 run_FK_test <- function(data){
@@ -720,6 +604,7 @@ df %>%
   run_FK_test() %>% 
   arrange(pval)
 ```
+
 
 ### No Hopkins (raw)
 
@@ -751,7 +636,7 @@ ratio_stats %>%
 #### p-values {.tabset}
 
 ```{r}
-perm_df <- make_perm_df(ratio_stats, null_dist)
+perm_df2 <- perm_df <- make_perm_df(ratio_stats, null_dist)
 ```
 
 ##### Plot 
@@ -767,13 +652,27 @@ perm_df %>%
   arrange(desc(pval))
 ```
 
-#### Effect size: f2
+#### Effect size: f2 {.tabset}
 
 ```{r}
-df %>% 
-  filter(site != 'Hopkins') %>% 
+f2_df <- df %>% 
+  filter(site!='Hopkins') %>% 
   get_f2() %>% 
   arrange(desc(f2))
+```
+
+
+##### Plot 
+
+```{r}
+plot_f2(f2_df)
+```
+
+
+##### Table
+
+```{r}
+f2_df
 ```
 
 #### FK test
@@ -813,7 +712,7 @@ ratio_stats %>%
 #### p-values {.tabset}
 
 ```{r}
-perm_df <- make_perm_df(ratio_stats, null_dist)
+perm_df3 <- perm_df <- make_perm_df(ratio_stats, null_dist)
 ```
 
 ##### Plot 
@@ -829,12 +728,26 @@ perm_df %>%
   arrange(desc(pval))
 ```
 
-#### Effect size: f2
+#### Effect size: f2 {.tabset}
 
 ```{r}
-harmonized_df %>% 
+f2_df <- harmonized_df %>% 
   get_f2() %>% 
   arrange(desc(f2))
+```
+
+
+##### Plot 
+
+```{r}
+plot_f2(f2_df)
+```
+
+
+##### Table
+
+```{r}
+f2_df
 ```
 
 #### FK test
@@ -843,6 +756,40 @@ harmonized_df %>%
 harmonized_df %>% 
   run_FK_test() %>% 
   arrange(pval)
+```
+
+### Outcomes (failed harmonization) {.tabset}
+
+#### Post harmonization {.tabset}
+
+```{r, results='asis'}
+failed_harm_outcomes <- perm_df %>% 
+  filter(pval_fdr <= 0.05) %>% 
+  rownames()
+
+failed_dplots_post <- lapply(failed_harm_outcomes, plot_densities, data=harmonized_df) %>% 
+  setNames(failed_harm_outcomes)
+failed_dplots_pre <- lapply(failed_harm_outcomes, plot_densities, data=df) %>% 
+  setNames(failed_harm_outcomes)
+
+for (name in names(failed_dplots_post)){
+  cat("#####",  str_replace_all(name, "_", " "), "\n")
+  print(failed_dplots_post[[name]])
+  cat("\n\n")
+}
+```
+
+#### Pre harmonization {.tabset}
+
+```{r, results='asis'}
+failed_dplots_pre <- lapply(failed_harm_outcomes, plot_densities, data=df) %>% 
+  setNames(failed_harm_outcomes)
+
+for (name in names(failed_dplots_pre)){
+  cat("#####",  str_replace_all(name, "_", " "), "\n")
+  print(failed_dplots_pre[[name]])
+  cat("\n\n")
+}
 ```
 
 ### No Hopkins  (harmonized)
@@ -873,7 +820,7 @@ ratio_stats %>%
 #### p-values {.tabset}
 
 ```{r}
-perm_df <- make_perm_df(ratio_stats, null_dist)
+perm_df4 <- perm_df <- make_perm_df(ratio_stats, null_dist)
 ```
 
 ##### Plot 
@@ -889,12 +836,26 @@ perm_df %>%
   arrange(desc(pval))
 ```
 
-#### Effect size: f2
+#### Effect size: f2 {.tabset}
 
 ```{r}
-harmonized_no_hopkins_df %>% 
+f2_df <- harmonized_no_hopkins_df %>% 
   get_f2() %>% 
   arrange(desc(f2))
+```
+
+
+##### Plot 
+
+```{r}
+plot_f2(f2_df)
+```
+
+
+##### Table
+
+```{r}
+f2_df
 ```
 
 #### FK test
@@ -904,6 +865,60 @@ harmonized_no_hopkins_df %>%
   run_FK_test() %>% 
   arrange(pval)
 ```
+
+### Comparison between datasets
+
+#### Permutation test p-values
+
+```{r}
+# plot p-values for all dataset configs
+list(perm_df1, perm_df2, perm_df3, perm_df4) %>% 
+  map(rownames_to_column, var = 'outcome') %>% 
+  bind_rows() %>% 
+  add_column(excluded_hopkins = factor(rep(c('No', 'Yes', 'No', 'Yes'), each = 36), levels = c('Yes', 'No')), 
+             harmonized = factor(rep(c('No', 'No', 'Yes', 'Yes'), each = 36), levels = c('Yes', 'No')),
+             .before='outcome') %>% 
+  ggplot(aes(x=outcome, y = pval_fdr, color = harmonized, shape = excluded_hopkins)) + 
+  geom_point(alpha = 1) + 
+  coord_flip() + 
+  scale_color_manual(values = c('dodgerblue', 'red')) + 
+  scale_shape_manual(values=c(4, 0)) + 
+  ggtitle('Comparison of p-values between datasets') + 
+  ylab('P-value (FDR corrected)')
+  
+```
+
+#### Effect size: f2
+
+```{r}
+rbind(
+  df %>% 
+    get_f2() %>% 
+  rownames_to_column(var = 'outcome'),
+  df %>% 
+    filter(site != 'Hopkins') %>% 
+    get_f2() %>% 
+  rownames_to_column(var = 'outcome'),
+  harmonized_df %>% 
+    get_f2() %>% 
+  rownames_to_column(var = 'outcome'),
+  harmonized_no_hopkins_df %>% 
+    get_f2() %>% 
+  rownames_to_column(var = 'outcome')
+)  %>% 
+add_column(excluded_hopkins = factor(rep(c('No', 'Yes', 'No', 'Yes'), each = 36), levels = c('Yes', 'No')), 
+           harmonized = factor(rep(c('No', 'No', 'Yes', 'Yes'), each = 36), levels = c('Yes', 'No')),
+           .before='outcome') %>% 
+  ggplot(aes(x=outcome, y = f2, color = harmonized, shape = excluded_hopkins)) + 
+  geom_point(alpha = 1) + 
+  coord_flip() + 
+  scale_color_manual(values = c('dodgerblue', 'red')) + 
+  scale_shape_manual(values=c(4, 0)) + 
+  ggtitle('Comparison of f2 between datasets') + 
+  ylab('f2 of fixed effect of site')
+```
+
+
 
 ## Mixed Models
 
@@ -1318,8 +1333,6 @@ plot_ICC_site(icc_df, boot_df)
 ```{r}
 plot_ICC_subject(icc_df, boot_df)
 ```
-
-After FDR-adjustment, 14 of the 36 variables show site effects according to the mixed models run on non-Hopkins data.
 
 ### No Hopkins (harmonized)
 
