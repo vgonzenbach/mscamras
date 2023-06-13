@@ -78,9 +78,19 @@ Note the general <SEGMENTATION>_<ROI>_<SCALAR> format: for example, the ATROPOS_
 
 ### Testing site effects
 
-Testing for site effects was performed using two approaches: a permutation-based approach and a deviance test of mixed models.  
+Testing for site effects was performed using two approaches: a permutation-based approach and a asymptotic Likelihood Ratio Test between mixed models.  
 
-Additionally, as Hopkins data was acquired using a Philips scanner, which is in contrast to all other sites, the two testing approaches were performed again while excluding Hopkins data.
+Results are presented for 4 kind of datasets:   
+ 
+- All sites (raw): A dataset consisting observations from all the four study sites. 
+- No Hopkins (raw): A dataset excluding data from Hopkins (as this data was collected using a Philips scanner and with Distortion Correction, unlikely other sites).
+
+Longitudinal Combat (Beer et al. 2020) was performed on these two datasets leading to two more datasets to examine: 
+
+- All sites (harmonized): A harmonized dataset including all observations
+- No Hopkins (harmonized): A harmonized dataset where observations from Hopkins were excluded prior to harmonization. 
+
+Performing the test for site effects on all these datasets allows for evaluating the effectiveness of harmonization at eliminating site effects, as well as examining to what extent Hopkins contributes to site effects in the raw and harmonized data. 
 
 #### Permutation-Based F-test
 
@@ -103,9 +113,9 @@ For each metric, the observed test statistic was compared to a distribution of t
 
 $$ p = \frac{10000*p_0 + 1}{10000 + 1}$$
 
-To quantify these site effects, $f^2$ u$R^2$ was computed from the model `outcome ~ (1|subject) + site` (i.e. $y_{ijk}$ following the method in Nakagawa & Schielzeth (2013), which is implemented in `performance::r2_nakagawa`. Thus, the (marginal) $R^2$ quantifies the proportion of variance explained by the fixed effect relative to the total variance:
+To quantify these site effects, Cohen's $f^2$ was computed from (marginal) $R^2$ values, which were calculated as presented in the work Nakagawa & Schielzeth (2013) using the function `performance::r2_nakagawa`. The (marginal) $R^2$ quantifies the proportion of variance explained by the fixed effect relative to the total variance:
 
-$$ R^2_{(m)} = \frac{\sigma_{site}^2}{\sigma_{site}^2 + \sigma_{subject}^2 + \sigma_{\epsilon}^2}$$
+$$ R^2 = \frac{\sigma_{site}^2}{\sigma_{site}^2 + \sigma_{subject}^2 + \sigma_{\epsilon}^2}$$
 
 
 where:   
@@ -114,7 +124,13 @@ where:
 - $\sigma^2_{subject}$ is the variance component of the random effect for subject.  
 - $\sigma^2_{\epsilon}$ is the variance of the residuals.
 
-The residuals from these models were subsequently utilized to test for the presence of multiplicative site effects (i.e. differences in site-specific variance) using the Fligner-Killeen test ( (Fligner, & Killeen, 1976). The FK test was chosen for its robustness under non-normality and high power for small samples (Conover, Johnson, & Johnson, 1981). 
+Thus, the marginal $R^2$ was computed for the following models:  
+- Reduced model (denoted $a$): `outcome ~ (1 | subject)`.
+- Full model (denoted $ab$): `outcome ~ (1 | subject) + (1 | site)`
+
+And these values were used to calculated the $$f^2 = \frac{R^2_{ab} - R^2_a}{1 - R^2_{ab}} = \frac{R^2_{ab}}{1 - R^2_{ab}}$$ as the marginal $R^2 = 0$ for a model with no fixed effects (i.e. model $a$). The magnitude of the effect size was interpreted according to Cohen's (1992) guidelines: "0.02 is a small effect, 0.15 is a medium effect, and 0.35 is a large effect."
+
+The residuals from these model $ab$ were subsequently utilized to test for the presence of multiplicative site effects (i.e. differences in site-specific variance) using the Fligner-Killeen test (Fligner, & Killeen, 1976). The FK test was chosen for its robustness under non-normality and high power for small samples (Conover, Johnson, & Johnson, 1981). 
 
 <details>
   <summary> See details of the FK test implementation</summary>
@@ -132,32 +148,38 @@ The residuals from these models were subsequently utilized to test for the prese
 
 As an additional test of site effects, mixed models were performed corresponding to a crossed design using the `lmer` function of the `lme4` package. For each outcome variable, two mixed-effects models were fitted: The formula for the base model includes a random intercept for subject. The formula for the extended model also includes a random intercept for site. 
 
-Base Model:
+
+Reduced Model:
 
 ```
 outcome ~ (1|subject) 
 ```
 
-Extended model:
+Full model:
 
 ```
 outcome ~ (1|subject) + (1|site)
 ```
 
-For each of the outcome variables, these two models were compared through an asymptotic Likelihood Ratio Test according to Self & Liang (1987). Thus, the final p-values for these tests were calculated using a 50:50 mixture of a $\chi^2_1$ and $\chi^2_2$ distributions. 
+For each of the outcome variables, these two models were compared through an asymptotic Likelihood Ratio Test  as described by Self & Liang (1987). Thus, the final p-values for these tests were calculated using a 50:50 mixture of a $\chi^2_1$ and $\chi^2_2$ distributions. 
 
-To illustrate effect sizes, ICC for both site and subject random intercepts was computed for the full model using the `performance::icc` function. 95% Confidence Intervals for the full models were computed via bootstrapping ($B=5000$). The subject IDs were sampled with replacement. For each iteration, a bootstrap dataset was constructed by selecting all rows from the original dataset that correspond to the given subject ID. As repetition of subject IDs was possible, duplicate rows were also possible. The 2.5 and 97.5 pecentiles of the overall bootstrap distribution served as the limits of the 95% CI. 
+To illustrate effect size, ICC for both site and subject random intercepts was computed from the full model using the `performance::icc` function. 95% Confidence Intervals for the ICCs were computed via bootstrapping ($B=5000$). The subject IDs were sampled with replacement. For each iteration, a bootstrap dataset was constructed by selecting all rows from the original dataset that correspond to the given subject ID. As repetition of subject IDs was possible, duplicate rows were also possible. The 2.5 and 97.5 pecentiles of the overall bootstrap distribution served as the limits of the 95% CI. 
 
 [Source code](https://github.com/vgonzenbach/mscamras/tree/dti) for this project can be found on GitHub.
 
 ## Key Findings 
 
-- Permutation tests revealed significant site effects in 31 out of 36 outcomes after FDR adjustment when all data is included. After excluding Hopkins data, the number of significant site effects decreased to 13. Most of the DTI metrics (i.e. outcomes) that showed differences were derived from thalamus segmentation results. 
-- For mixed models, most outcome variables (13 out of 36) show a significant test after FDR adjustment indicating the presence of site effects when all data is included. When Hopkins data is excluded, none of the outcome variables show site effects. 
+### Permutation tests
 
-## Questions for follow up  
+- Permutation tests revealed significant site effects in 34 out of 36 outcomes after FDR adjustment when all data is included with variable effect size (1/3 of which were larger than a medium effect). 
+- After excluding Hopkins data, the number of significant site effects decreased to 25 out of 36. The site effects were almost all (34 out of 36) smaller than a medium effect. 
+- Harmonization reduced to negligible quantities regardless of whether excluding Hopkins or not. However, permutation test still flagged 13 effects as significant when not excluding Hopkins. No site effects were significant when excluding Hopkins prior to harmonization. 
+- After FDR correction, no multiplicative site effects were significants. 
 
-- It is unclear to what extent potential segmentation differences across sites might contribute to site effects, i.e. to what extent do site differences stem from ROI coverage differences (due to scanner effects on the T1s), and to what extent are the differences due to scanner effects on DWI images? 
+### Mixed models
+
+- Before harmonization there were 31 and 15 significant site effects in the "all site" data and "no hopkins" data, respectively. 
+- Models run on harmonized data had trouble fitting. However, the p-values show that there were no significant site effects in either case ("all sites" and " no hopkins")
 
 ## Data Inventory
 
@@ -393,7 +415,7 @@ df <- fill_na_atropos(df)
 #harmonized_df <- fill_na_atropos(harmonized_df)
 ```
 
-The permutation-based F-test was carried out as previously described. The observed F-statistic for each of the metrics is plotted below as a black dot, while the distribution of permuted test statistics is shown as a white violin plot. All metrics showed significant site effects. 
+The permutation-based F-test was carried out as previously described and results are presented in this section for the 4 datasets of interest. 
 
 ```{r}
 ratio_stats = readRDS(here::here("results/avg_tensor_by_roi_wide_F_df.rds"))
@@ -406,6 +428,10 @@ null_dist = readRDS(here::here("results/avg_tensor_by_roi_wide_null_F_df.rds")) 
 
 #### F Distributions {.tabset}
 
+The observed F-statistic for each of the metrics is plotted below as a black dot, while the distribution of permuted test statistics is shown as a white violin plot. All metrics showed significant site effects. 
+
+The plot below shows that the observed F statistics are quite extreme relative to the permutation-derived distribution. The table also shows the sample-wide $\bar{MS_B}$ and $\bar{MS_W}$ values used to compute the observed F. 
+
 ##### Plot
 
 ```{r, warning=FALSE}
@@ -417,7 +443,9 @@ plot_F_dist <- function(ratio_stats, null_dist){
   geom_violin(draw_quantiles = c(0.95)) + 
   coord_flip() + 
   geom_point(aes(x=outcome, y=F), 
-             data=tibble::rownames_to_column(ratio_stats)) 
+             data=tibble::rownames_to_column(ratio_stats)) + 
+  ggtitle("Permutation F results by outcome") + 
+    ylim(c(0,22))
 }
 
 plot_F_dist(ratio_stats, null_dist)
@@ -432,6 +460,8 @@ ratio_stats %>%
 
 
 #### p-values {.tabset}
+
+According to the permutation F test, 34 out of 36 outcomes showed significant site effects after FDR correction. 
 
 ```{r}
 #' get p value of F by comparing to permutation distribution
@@ -480,6 +510,8 @@ perm_df1 <- perm_df <- make_perm_df(ratio_stats, null_dist)
 
 ##### Plot 
 
+Cohen's f2
+
 ```{r}
 plot_p_perm <- function(perm_df){
   perm_df %>% 
@@ -505,6 +537,8 @@ perm_df %>%
 
 
 #### Effect size: f2 {.tabset}
+
+The Cohen's $f^2$ for the effects range from large (2), medium-to-large (9), small-to-medium (22), and small (2) as defined by the cut-offs given by Cohen (1992; see Summary). This indicated considerable variability in the magnitude of the effects but that almost 1/3 of these are larger than a medium effect. 
 
 ```{r}
 ### Make this into a function
@@ -562,7 +596,8 @@ plot_f2 <- function(f2_df){
   ggplot(aes(x=outcome, y=f2)) + 
   geom_point() +
   coord_flip() + 
-  ggtitle("f2 of fixed site effect per outcome")
+  ggtitle("f2 of fixed site effect per outcome") + 
+  scale_y_continuous(breaks=seq(0, 1, .1))
 }
 
 plot_f2(f2_df)
@@ -576,6 +611,8 @@ f2_df
 ```
 
 #### FK test {.tabset}
+
+The FK test revealed no significant multiplicative site effects on the residuals. 
 
 ```{r}
 run_FK_test <- function(data){
@@ -608,7 +645,7 @@ df %>%
 
 ### No Hopkins (raw)
 
-Image acquisition at Hopkins was performed with a Philips scanner and distortion correction during on-scanner reconstruction. As the scanner manufacturer and reconstructions method differed than other sites, here we report the permutation results based on the non-Hopkins data only.
+Image acquisition at Hopkins was performed with a Philips scanner and with distortion correction during on-scanner reconstruction. As the scanner manufacturer and reconstructions method differed than other sites, here we report the permutation results based on the non-Hopkins data only.
 
 ```{r}
 ratio_stats = readRDS(here::here("results/avg_tensor_by_roi_wide_no_Hopkins_F_df.rds"))
@@ -618,6 +655,8 @@ null_dist = readRDS(here::here("results/avg_tensor_by_roi_wide_no_Hopkins_null_F
 ```
 
 #### F Distributions {.tabset}
+
+As the plot show, the observed Fs are still quite extreme albeit less so relative to when all data is included. 
 
 ##### Plot
 
@@ -634,6 +673,8 @@ ratio_stats %>%
 
 
 #### p-values {.tabset}
+
+The p-values have been shifted away from zero. In this case, there were 25 out of 36 significant site effects (significance dropped on 9 of the tests when Hopkins is excluded).
 
 ```{r}
 perm_df2 <- perm_df <- make_perm_df(ratio_stats, null_dist)
@@ -653,6 +694,8 @@ perm_df %>%
 ```
 
 #### Effect size: f2 {.tabset}
+
+Now, effects range from large (1), medium-to-large (1), small-to-medium (17), and small (17) demonstrating an overall decrease in the magnitude of the effects: Almost all effects (34 out of 36) are smaller than a medium effect.
 
 ```{r}
 f2_df <- df %>% 
@@ -677,6 +720,8 @@ f2_df
 
 #### FK test
 
+Again, no significant multiplicative site effects were found. 
+
 ```{r}
 df %>% 
   filter(site != 'Hopkins') %>% 
@@ -686,6 +731,8 @@ df %>%
 
 ### All site  (harmonized)
 
+In this section, we examine permutation results computed from the harmonized full dataset. 
+
 ```{r}
 ratio_stats = readRDS(here::here("results/avg_tensor_by_roi_wide_harmonized_F_df.rds"))
 null_dist = readRDS(here::here("results/avg_tensor_by_roi_wide_harmonized_null_F_df.rds")) %>% 
@@ -694,6 +741,8 @@ null_dist = readRDS(here::here("results/avg_tensor_by_roi_wide_harmonized_null_F
 ```
 
 #### F Distributions {.tabset}
+
+After harmonization, we observed less extreme F values compared to the two previous examples. 
 
 ##### Plot
 
@@ -710,6 +759,8 @@ ratio_stats %>%
 
 
 #### p-values {.tabset}
+
+Most site effects were non-significant, but the permutation shows that roughly 1/3 (13 out of 36) are still significant. 
 
 ```{r}
 perm_df3 <- perm_df <- make_perm_df(ratio_stats, null_dist)
@@ -729,6 +780,8 @@ perm_df %>%
 ```
 
 #### Effect size: f2 {.tabset}
+
+However, examining the effect size reveals that all site effects are below the 0.02 "small effect" cut off, indicating these site effects are (almost?) neglibile. 
 
 ```{r}
 f2_df <- harmonized_df %>% 
@@ -752,6 +805,8 @@ f2_df
 
 #### FK test
 
+No multiplicative site effects are significant after correcting via FDR.  
+
 ```{r}
 harmonized_df %>% 
   run_FK_test() %>% 
@@ -759,6 +814,8 @@ harmonized_df %>%
 ```
 
 ### Outcomes (failed harmonization) {.tabset}
+
+In this section, we visually examine the pre- and post- harmonization distribution for outcomes that were flagged as having significant site effects.  We can see that the distributions are more centered toward each other after harmonization relative to pre-harmonization. But owing to multimodality in some cases, or apparent non-normality in general, there were some limitations in the degree to which long ComBat lined up the distributions. 
 
 #### Post harmonization {.tabset}
 
@@ -794,6 +851,8 @@ for (name in names(failed_dplots_pre)){
 
 ### No Hopkins  (harmonized)
 
+The last dataset we test on is the data were Hopkins observations were excluded prior to harmonization. 
+
 ```{r}
 ratio_stats = readRDS(here::here("results/avg_tensor_by_roi_wide_no_Hopkins_harmonized_F_df.rds"))
 null_dist = readRDS(here::here("results/avg_tensor_by_roi_wide_no_Hopkins_harmonized_null_F_df.rds")) %>% 
@@ -802,6 +861,8 @@ null_dist = readRDS(here::here("results/avg_tensor_by_roi_wide_no_Hopkins_harmon
 ```
 
 #### F Distributions {.tabset}
+
+Relative to other datasets, this dataset has the least extreme F values of all. 
 
 ##### Plot
 
@@ -818,6 +879,8 @@ ratio_stats %>%
 
 
 #### p-values {.tabset}
+
+The p-values show that when excluding Hopkins, harmonization fully corrects for site effects in all outcomes!
 
 ```{r}
 perm_df4 <- perm_df <- make_perm_df(ratio_stats, null_dist)
@@ -837,6 +900,8 @@ perm_df %>%
 ```
 
 #### Effect size: f2 {.tabset}
+
+The magnitude of the effects has shrunk toward 0 by one order of magnitude relative to the full harmonized dataset. 
 
 ```{r}
 f2_df <- harmonized_no_hopkins_df %>% 
@@ -860,6 +925,8 @@ f2_df
 
 #### FK test
 
+Again, no effects (even without correcting for multiple comparisons).
+
 ```{r}
 harmonized_no_hopkins_df %>% 
   run_FK_test() %>% 
@@ -868,6 +935,8 @@ harmonized_no_hopkins_df %>%
 
 ### Comparison between datasets
 
+Here, we visually compare p-values and $f^2$ for all datasets.
+
 #### Permutation test p-values
 
 ```{r}
@@ -875,20 +944,22 @@ harmonized_no_hopkins_df %>%
 list(perm_df1, perm_df2, perm_df3, perm_df4) %>% 
   map(rownames_to_column, var = 'outcome') %>% 
   bind_rows() %>% 
-  add_column(excluded_hopkins = factor(rep(c('No', 'Yes', 'No', 'Yes'), each = 36), levels = c('Yes', 'No')), 
+  add_column(hopkins = factor(rep(c('Included', 'Excluded', 'Included', 'Excluded'), each = 36), levels = c('Included', 'Excluded')), 
              harmonized = factor(rep(c('No', 'No', 'Yes', 'Yes'), each = 36), levels = c('Yes', 'No')),
              .before='outcome') %>% 
-  ggplot(aes(x=outcome, y = pval_fdr, color = harmonized, shape = excluded_hopkins)) + 
+  ggplot(aes(x=outcome, y = pval_fdr, color = harmonized, shape = hopkins)) + 
   geom_point(alpha = 1) + 
   coord_flip() + 
   scale_color_manual(values = c('dodgerblue', 'red')) + 
-  scale_shape_manual(values=c(4, 0)) + 
+  scale_shape_manual(values=c(0, 4)) + 
   ggtitle('Comparison of p-values between datasets') + 
   ylab('P-value (FDR corrected)')
   
 ```
 
 #### Effect size: f2
+
+In most cases, harmonizing the full dataset was more effective than removing Hopkins data except for MIMOSA lesion metrics, most JLF GM metrics (3/4), most ATROPOS GM metrics (3/4), etc.  
 
 ```{r}
 rbind(
@@ -906,27 +977,26 @@ rbind(
     get_f2() %>% 
   rownames_to_column(var = 'outcome')
 )  %>% 
-add_column(excluded_hopkins = factor(rep(c('No', 'Yes', 'No', 'Yes'), each = 36), levels = c('Yes', 'No')), 
-           harmonized = factor(rep(c('No', 'No', 'Yes', 'Yes'), each = 36), levels = c('Yes', 'No')),
-           .before='outcome') %>% 
-  ggplot(aes(x=outcome, y = f2, color = harmonized, shape = excluded_hopkins)) + 
+  add_column(hopkins = factor(rep(c('Included', 'Excluded', 'Included', 'Excluded'), each = 36), levels = c('Included', 'Excluded')), 
+             harmonized = factor(rep(c('No', 'No', 'Yes', 'Yes'), each = 36), levels = c('Yes', 'No')),
+             .before='outcome') %>% 
+  ggplot(aes(x=outcome, y = f2, color = harmonized, shape = hopkins)) + 
   geom_point(alpha = 1) + 
   coord_flip() + 
   scale_color_manual(values = c('dodgerblue', 'red')) + 
-  scale_shape_manual(values=c(4, 0)) + 
+  scale_shape_manual(values=c(0, 4)) + 
   ggtitle('Comparison of f2 between datasets') + 
-  ylab('f2 of fixed effect of site')
+  ylab('f2 of fixed effect of site') + 
+  scale_y_continuous(breaks=seq(0, 1, .1))
 ```
-
-
 
 ## Mixed Models
 
-For each of the 36 outcome variables, two mixed models (a base and an extended model) were fit and the extended model of interest was compared against the null/base model using a likelihood ratio test. The resulting p-values are reported. ICCs based on the extented model are also reported. 
+Mixed models were fitted and tested against each other as described above. 
 
 ### All Sites (raw data)
 
-Of note, two of the models estimated a 0 variance for the site random effect. P-values and ICCs are not provided for these two models.
+Of note, one model had issues being fit due to 0 variance. Almost all model residuals followed a normal distribution very closely. 
 
 ```{r, warning=TRUE}
 # Full models
@@ -1025,6 +1095,8 @@ imap(models, plot_resid)
 
 #### p-values {.tabset}
 
+31 out of 36 site effects were statistically significant. 
+
 ```{r}
 make_SL_df <- function(models, models_0){
   purrr::map2(models, models_0, test_variance_term) %>% 
@@ -1067,7 +1139,7 @@ p_df
 
 #### Effect size: ICC {.tabset}
 
-ICC for the 35 remaining models is shown
+Confidence intervals for site ICC show that most are non-zero. 
 
 ```{r}
 options(scipen=999)
@@ -1086,9 +1158,8 @@ get_icc <- function(df){
     arrange(desc(ICC_site))
 }
 # extract observed icc_df
-(icc_df <- get_icc(df))
+icc_df <- get_icc(df)
 ```
-
 
 ##### Site
 
@@ -1130,13 +1201,17 @@ plot_ICC_subject <- function(icc_df, boot_df){
 plot_ICC_subject(icc_df, boot_df)
 ```
 
-After FDR-adjustment, 34 of the 36 variables show site effects according to the mixed models. 
+##### Table
+
+```{r}
+icc_df
+```
 
 ### No Hopkins (raw data)
 
-Here, we report results from the mixed models carried out only on the non-Hopkins data.
+Here, we report results from the mixed models carried out only on the non-Hopkins data. One of the models had trouble fitting due to 0 variance of the random effect for site. 
 
-```{r, warning=TRUE}
+```{r, warning=FALSE}
 models <- df %>% 
   filter(site != 'Hopkins') %>% 
   run_full_models()
@@ -1187,6 +1262,8 @@ imap(models, plot_resid)
 
 #### p-values {.tabset}
 
+The number of significant site effects has been reduced after excluding Hopkins data, yet 15 out of 36 remain significant. 
+
 ```{r}
 p_df <- make_SL_df(models, models_0)
 ```
@@ -1208,7 +1285,7 @@ p_df %>%
 
 #### Effect size: ICC {.tabset}
 
-ICC for the 35 remaining models is shown below
+ICC of site across models is reduced across all features and a greater number of CIs now include 0. 
 
 
 ```{r}
@@ -1216,8 +1293,6 @@ ICC for the 35 remaining models is shown below
 icc_df <- df %>% 
   filter(site != 'Hopkins') %>% 
   get_icc()
-
-icc_df
 ```
 
 ##### Site
@@ -1234,11 +1309,17 @@ plot_ICC_site(icc_df, boot_df)
 plot_ICC_subject(icc_df, boot_df)
 ```
 
-After FDR-adjustment, 14 of the 36 variables show site effects according to the mixed models run on non-Hopkins data.
+##### Table
+
+```{r}
+icc_df
+```
 
 ### All sites (harmonized data)
 
 Here, we report results from the mixed models carried out only on the non-Hopkins data.
+
+Most models had trouble fitting due to 0 variance. 
 
 ```{r, warning=TRUE}
 models <- harmonized_df %>% 
@@ -1289,6 +1370,8 @@ imap(models, plot_resid)
 
 #### p-values {.tabset}
 
+The tests for all models are non-significant!
+
 ```{r}
 p_df <- make_SL_df(models, models_0)
 ```
@@ -1310,14 +1393,12 @@ p_df %>%
 
 #### Effect size: ICC {.tabset}
 
-ICC for the 35 remaining models is shown below
+As most models had issues fitting due to 0 variance only 2 ICCs are shown. 
 
 ```{r}
 # extract icc_df
 icc_df <- harmonized_df %>% 
   get_icc()
-
-icc_df
 ```
 
 ##### Site
@@ -1334,9 +1415,15 @@ plot_ICC_site(icc_df, boot_df)
 plot_ICC_subject(icc_df, boot_df)
 ```
 
+##### Table
+
+```{r}
+icc_df
+```
+
 ### No Hopkins (harmonized)
 
-Here, we report results from the mixed models carried out only on the non-Hopkins data.
+Here, we report results from the mixed models carried out only on the non-Hopkins data. Again, most models had a zero variance and gave warnings. 
 
 ```{r}
 models <- harmonized_no_hopkins_df %>% 
@@ -1387,6 +1474,8 @@ imap(models, plot_resid)
 
 #### p-values {.tabset}
 
+As above, all site effects are non-significant. 
+
 ```{r}
 p_df <- make_SL_df(models, models_0)
 ```
@@ -1408,14 +1497,10 @@ p_df %>%
 
 #### Effect size: ICC {.tabset}
 
-ICC for the 35 remaining models is shown below
-
 ```{r}
 # extract icc_df
 icc_df <- harmonized_no_hopkins_df %>% 
   get_icc()
-
-icc_df
 ```
 
 ##### Site
@@ -1430,6 +1515,12 @@ plot_ICC_site(icc_df, boot_df)
 
 ```{r}
 plot_ICC_subject(icc_df, boot_df)
+```
+
+##### Table
+
+```{r}
+icc_df
 ```
 
 After FDR-adjustment, 14 of the 36 variables show site effects according to the mixed models run on non-Hopkins data.
